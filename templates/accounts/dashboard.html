@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}My Account — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    <aside class="dash-nav">
+      <a href="{% url 'accounts:dashboard' %}" class="active">🏠 Overview</a>
+      <a href="{% url 'accounts:profile' %}">👤 Profile</a>
+      <a href="{% url 'orders:history' %}">🧾 My orders</a>
+      <a href="{% url 'accounts:addresses' %}">📍 Addresses</a>
+      <a href="{% url 'store:menu' %}">☕ Order again</a>
+      <a href="{% url 'accounts:password_change' %}">🔒 Password</a>
+      <a href="{% url 'accounts:logout' %}">↩ Sign out</a>
+    </aside>
+
+    <div>
+      <span class="eyebrow">Welcome back</span>
+      <h1 style="font-size:1.9rem">Hi, {{ user.get_short_name }} 👋</h1>
+
+      <div class="metric-grid mt-3">
+        <div class="card metric"><div class="label">Total orders</div><div class="value">{{ stats.total_orders }}</div></div>
+        <div class="card metric"><div class="label">Loyalty beans</div><div class="value">{{ stats.points }}</div></div>
+        <div class="card metric"><div class="label">Reward value</div><div class="value">{{ currency_symbol }}{{ stats.reward_value|floatformat:2 }}</div></div>
+        <div class="card metric"><div class="label">Reviews</div><div class="value">{{ stats.reviews }}</div></div>
+      </div>
+
+      <div class="card panel mt-3">
+        <div class="flex between center">
+          <h3>Recent orders</h3>
+          <a href="{% url 'orders:history' %}" class="btn btn-ghost btn-sm">View all</a>
+        </div>
+        {% if recent_orders %}
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Order</th><th>Date</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              {% for order in recent_orders %}
+              <tr>
+                <td><strong>{{ order.number }}</strong></td>
+                <td class="muted small">{{ order.created_at|date:"M d, Y" }}</td>
+                <td>{{ order.item_count }}</td>
+                <td>{{ currency_symbol }}{{ order.total|floatformat:2 }}</td>
+                <td><span class="status {{ order.status_color }}">{{ order.get_status_display }}</span></td>
+                <td><a class="btn btn-ghost btn-sm" href="{% url 'orders:track' order.number %}">Track</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <div class="empty"><div class="big">☕</div><p>No orders yet.</p><a href="{% url 'store:menu' %}" class="btn">Start ordering</a></div>
+        {% endif %}
+      </div>
+
+      <div class="grid grid-2">
+        <div class="card panel">
+          <h3>Loyalty activity</h3>
+          {% for tx in loyalty %}
+            <div class="flex between center" style="padding:.4rem 0;border-bottom:1px solid var(--line)">
+              <span class="small">{{ tx.get_reason_display }}<br><span class="muted">{{ tx.created_at|naturaltime }}</span></span>
+              <strong style="color:{% if tx.points >= 0 %}var(--success){% else %}var(--danger){% endif %}">{% if tx.points >= 0 %}+{% endif %}{{ tx.points }}</strong>
+            </div>
+          {% empty %}<p class="muted small">No activity yet.</p>{% endfor %}
+        </div>
+        <div class="card panel">
+          <h3>Saved addresses</h3>
+          {% for address in addresses %}
+            <div style="padding:.5rem 0;border-bottom:1px solid var(--line)">
+              <strong class="small">{{ address.get_label_display }}</strong>{% if address.is_default %} <span class="pill-note small">Default</span>{% endif %}
+              <p class="small muted">{{ address.one_line }}</p>
+            </div>
+          {% empty %}<p class="muted small">No saved addresses.</p>{% endfor %}
+          <a href="{% url 'accounts:addresses' %}" class="btn btn-ghost btn-sm mt-2">Manage addresses</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

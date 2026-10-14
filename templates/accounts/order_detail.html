@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Order {{ order.number }} — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container" style="max-width:800px">
+  <div class="flex between center mt-3">
+    <h1 style="font-size:1.7rem">Order {{ order.number }}</h1>
+    <span class="status {{ order.status_color }}">{{ order.get_status_display }}</span>
+  </div>
+  <p class="muted small">Placed {{ order.created_at|date:"F d, Y g:i A" }} · {{ order.get_fulfillment_display }}</p>
+
+  <div class="card panel mt-2">
+    {% for item in order.items.all %}
+      <div class="flex between center" style="padding:.6rem 0;border-bottom:1px solid var(--line)">
+        <span>{{ item.quantity }} × {{ item.name }}{% if item.options %} <span class="muted small">({{ item.options|default_if_none:"" }})</span>{% endif %}</span>
+        <span>{{ currency_symbol }}{{ item.line_total|floatformat:2 }}</span>
+      </div>
+    {% endfor %}
+    <div class="summary-row mt-2"><span>Subtotal</span><span>{{ currency_symbol }}{{ order.subtotal|floatformat:2 }}</span></div>
+    {% if order.discount %}<div class="summary-row"><span>Discount</span><span>-{{ currency_symbol }}{{ order.discount|floatformat:2 }}</span></div>{% endif %}
+    <div class="summary-row"><span>Delivery</span><span>{{ currency_symbol }}{{ order.delivery_fee|floatformat:2 }}</span></div>
+    <div class="summary-row"><span>Tax</span><span>{{ currency_symbol }}{{ order.tax|floatformat:2 }}</span></div>
+    {% if order.loyalty_discount %}<div class="summary-row"><span>Loyalty ({{ order.points_used }} beans)</span><span>-{{ currency_symbol }}{{ order.loyalty_discount|floatformat:2 }}</span></div>{% endif %}
+    <div class="summary-row total"><span>Total</span><span>{{ currency_symbol }}{{ order.total|floatformat:2 }}</span></div>
+  </div>
+  <a href="{% url 'accounts:dashboard' %}" class="btn btn-ghost btn-sm">← Back to account</a>
+</div>
+{% endblock %}

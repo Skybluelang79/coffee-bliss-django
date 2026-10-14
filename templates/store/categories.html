@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Categories — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="block" style="padding-top:2.5rem">
+  <div class="container">
+    <span class="eyebrow">Explore</span>
+    <h1>Shop by <span class="gradient-text">category</span></h1>
+    <div class="grid grid-3 mt-3">
+      {% for category in categories %}
+        <a href="{{ category.get_absolute_url }}" class="card reveal" data-tilt style="padding:2rem;text-align:center">
+          <div style="font-size:3rem">{{ category.icon|default:"☕" }}</div>
+          <h3 class="mt-1">{{ category.name }}</h3>
+          <p class="small">{{ category.description|default:"Handcrafted with care." }}</p>
+          <span class="pill-note">{{ category.product_count }} items</span>
+        </a>
+      {% empty %}
+        <p class="muted">No categories yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

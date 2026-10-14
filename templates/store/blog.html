@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Journal — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="block" style="padding-top:2.5rem">
+  <div class="container">
+    <span class="eyebrow">The Journal</span>
+    <h1>Stories from the <span class="gradient-text">roastery</span></h1>
+    <div class="grid grid-3 mt-3">
+      {% for post in posts %}
+        <a href="{{ post.get_absolute_url }}" class="card reveal" data-tilt>
+          <div class="product-media">
+            {% if post.cover_image %}<img src="{{ post.cover_image.url }}" alt="{{ post.title }}" />
+            {% else %}<div class="emoji-fallback">📓</div>{% endif %}
+          </div>
+          <div style="padding:1.3rem">
+            <span class="eyebrow">{{ post.published_at|date:"M d, Y" }} · {{ post.read_minutes }} min read</span>
+            <h3 class="mt-1">{{ post.title }}</h3>
+            <p class="small">{{ post.excerpt|default:post.body|truncatechars:110 }}</p>
+          </div>
+        </a>
+      {% empty %}
+        <p class="muted">No posts yet.</p>
+      {% endfor %}
+    </div>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="flex gap-sm center mt-4" style="justify-content:center">
+      {% if page_obj.has_previous %}<a class="btn btn-ghost btn-sm" href="?page={{ page_obj.previous_page_number }}">← Prev</a>{% endif %}
+      <span class="pill-note">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}<a class="btn btn-ghost btn-sm" href="?page={{ page_obj.next_page_number }}">Next →</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Customers — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    <aside class="dash-nav">
+      <a href="{% url 'dashboard:admin_home' %}">📊 Analytics</a>
+      <a href="{% url 'dashboard:customers' %}" class="active">👥 Customers</a>
+      <a href="{% url 'dashboard:reports' %}">📈 Reports</a>
+    </aside>
+    <div>
+      <h1 style="font-size:1.9rem">Customers</h1>
+      <form method="get" class="flex gap-sm mt-2" style="max-width:460px">
+        <input type="search" name="q" value="{{ query }}" class="form-input" placeholder="Search by name or email" />
+        <button class="btn">Search</button>
+      </form>
+      <div class="table-wrap mt-3">
+        <table class="data">
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Orders</th><th>Spent</th><th>Beans</th><th>Joined</th><th></th></tr></thead>
+          <tbody>
+            {% for u in users %}
+              <tr>
+                <td><strong>{{ u.get_full_name|default:u.get_short_name }}</strong></td>
+                <td class="small">{{ u.email }}</td>
+                <td><span class="status blue">{{ u.get_role_display }}</span></td>
+                <td>{{ u.order_count }}</td>
+                <td>{{ currency_symbol }}{{ u.spent|floatformat:2 }}</td>
+                <td>{{ u.loyalty_points }}</td>
+                <td class="muted small">{{ u.date_joined|date:"M d, Y" }}</td>
+                <td><a class="btn btn-ghost btn-sm" href="{% url 'dashboard:customer_detail' u.pk %}">View</a></td>
+              </tr>
+            {% empty %}<tr><td colspan="8" class="muted">No customers found.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

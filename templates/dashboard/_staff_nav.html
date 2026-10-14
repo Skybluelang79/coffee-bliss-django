@@ -1,0 +1,10 @@
+<aside class="dash-nav">
+  <a href="{% url 'dashboard:staff_home' %}" class="{% if nav == 'ops' %}active{% endif %}">🎯 Operations</a>
+  <a href="{% url 'dashboard:staff_kds' %}" class="{% if nav == 'kds' %}active{% endif %}">🖥️ Kitchen display</a>
+  <a href="{% url 'dashboard:staff_orders' %}" class="{% if nav == 'orders' %}active{% endif %}">🧾 Orders</a>
+  <a href="{% url 'dashboard:staff_reservations' %}" class="{% if nav == 'reservations' %}active{% endif %}">🗓️ Reservations</a>
+  <a href="{% url 'inventory:home' %}" class="{% if nav == 'inventory' %}active{% endif %}">📦 Inventory</a>
+  <a href="{% url 'inventory:recipes' %}" class="{% if nav == 'recipes' %}active{% endif %}">📋 Recipes</a>
+  <a href="{% url 'inventory:movements' %}" class="{% if nav == 'movements' %}active{% endif %}">🔁 Stock ledger</a>
+  {% if user.is_manager %}<a href="{% url 'dashboard:admin_home' %}" class="{% if nav == 'analytics' %}active{% endif %}">📊 Analytics</a>{% endif %}
+</aside>

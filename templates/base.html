@@ -1,0 +1,123 @@
+{% load static humanize %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}{{ SITE_NAME }} — Craft Coffee, Reimagined{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Coffee Bliss — small-batch roasted coffee, handcrafted drinks, and a delightful 3D ordering experience.{% endblock %}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'css/style.css' %}" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>" />
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem("coffee-bliss-theme");
+        if (saved === "light" || saved === "dark") {
+          document.documentElement.setAttribute("data-theme", saved);
+        }
+      } catch (e) {}
+    })();
+  </script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <div class="messages">
+    {% for message in messages %}
+      <div class="message {{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+
+  <nav class="navbar">
+    <div class="container nav-inner">
+      <a href="{% url 'store:home' %}" class="brand">
+        <span class="brand-mark">☕</span>
+        <span>Coffee <span class="gradient-text">Bliss</span></span>
+      </a>
+
+      <div class="nav-links" id="nav-links">
+        <a href="{% url 'store:menu' %}" class="{% if request.resolver_match.url_name == 'menu' %}active{% endif %}">Menu</a>
+        <a href="{% url 'store:subscriptions' %}">Coffee Club</a>
+        <a href="{% url 'orders:reserve' %}">Reserve</a>
+        <a href="{% url 'store:locations' %}">Locations</a>
+        <a href="{% url 'store:blog' %}">Journal</a>
+        <a href="{% url 'store:about' %}">About</a>
+      </div>
+
+      <div class="nav-actions">
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle light and dark theme" title="Toggle theme">
+          <span class="theme-icon" aria-hidden="true">🌙</span>
+        </button>
+        <a href="{% url 'orders:track_lookup' %}" class="btn btn-ghost btn-sm">Track</a>
+        <a href="{% url 'orders:cart' %}" class="cart-pill">
+          🛒 <span class="small">Cart</span>
+          {% if cart_count %}<span class="cart-badge">{{ cart_count }}</span>{% endif %}
+        </a>
+        {% if user.is_authenticated %}
+          {% if user.is_staff_member %}
+            <a href="{% if user.is_manager %}{% url 'dashboard:admin_home' %}{% else %}{% url 'dashboard:staff_home' %}{% endif %}" class="btn btn-ghost btn-sm">Dashboard</a>
+          {% else %}
+            <a href="{% url 'accounts:dashboard' %}" class="btn btn-ghost btn-sm">{{ user.get_short_name }}</a>
+          {% endif %}
+          <a href="{% url 'accounts:logout' %}" class="btn btn-sm">Sign out</a>
+        {% else %}
+          <a href="{% url 'accounts:login' %}" class="btn btn-ghost btn-sm">Sign in</a>
+          <a href="{% url 'accounts:signup' %}" class="btn btn-sm">Join free</a>
+        {% endif %}
+        <button class="nav-toggle" aria-label="Menu">☰</button>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="brand mb-2"><span class="brand-mark">☕</span> Coffee <span class="gradient-text">Bliss</span></div>
+          <p class="small">Small-batch roasts, handcrafted drinks, and a community that runs on good coffee. Brewed with love since 2016.</p>
+          <div class="chip-row mt-2">
+            <span class="pill-note">🌱 Fair trade</span>
+            <span class="pill-note">🔥 Fresh roast</span>
+          </div>
+        </div>
+        <div>
+          <h4>Shop</h4>
+          <a href="{% url 'store:menu' %}">Full menu</a>
+          <a href="{% url 'store:subscriptions' %}">Coffee Club</a>
+          <a href="{% url 'store:categories' %}">Categories</a>
+          <a href="{% url 'orders:cart' %}">Your cart</a>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <a href="{% url 'store:about' %}">Our story</a>
+          <a href="{% url 'store:blog' %}">Journal</a>
+          <a href="{% url 'store:locations' %}">Locations</a>
+          <a href="{% url 'store:contact' %}">Contact</a>
+        </div>
+        <div>
+          <h4>Fresh brews, straight to your inbox</h4>
+          <form method="post" action="{% url 'store:subscribe' %}" data-validate class="flex gap-sm">
+            {% csrf_token %}
+            <input type="email" name="email" class="form-input" placeholder="you@example.com" required />
+            <button class="btn" type="submit">Join</button>
+          </form>
+          <p class="small mt-1">Get 10% off your first online order.</p>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© {{ current_year }} {{ SITE_NAME }}. All rights reserved.</span>
+        <span>Crafted with ☕ in the cloud · <a href="/api/docs/">API</a> · <a href="{% url 'admin:index' %}">Staff portal</a></span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="{% static 'js/main.js' %}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

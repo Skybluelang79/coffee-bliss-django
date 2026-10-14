@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Inventory — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    {% include "dashboard/_staff_nav.html" with nav="inventory" %}
+    <div>
+      <span class="eyebrow">Warehouse</span>
+      <h1 style="font-size:1.9rem">Inventory</h1>
+
+      <div class="metric-grid mt-3">
+        <div class="card metric"><div class="label">Stock value</div><div class="value">{{ currency_symbol }}{{ total_value|floatformat:2 }}</div></div>
+        <div class="card metric"><div class="label">Low stock</div><div class="value">{{ low_count }}</div></div>
+        <div class="card metric"><div class="label">Out of stock</div><div class="value">{{ out_count }}</div></div>
+        <div class="card metric"><div class="label">Ingredients</div><div class="value">{{ ingredients|length }}</div></div>
+      </div>
+
+      <div class="card panel mt-3">
+        <div class="flex between center mb-2">
+          <h3>Ingredients</h3>
+          <a href="{% url 'inventory:create' %}" class="btn btn-sm">+ Add ingredient</a>
+        </div>
+        <form method="get" class="flex gap-sm mb-2">
+          <input type="search" name="q" value="{{ query }}" class="form-input" placeholder="Search name or SKU…">
+          <button class="btn btn-sm btn-ghost">Search</button>
+        </form>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Ingredient</th><th>SKU</th><th>Stock</th><th>Reorder</th><th>Value</th><th>Supplier</th><th></th></tr></thead>
+            <tbody>
+              {% for ing in ingredients %}
+                <tr>
+                  <td><a href="{% url 'inventory:detail' ing.pk %}"><strong>{{ ing.name }}</strong></a>
+                    {% if not ing.is_active %}<span class="status gray">inactive</span>{% endif %}</td>
+                  <td class="muted small">{{ ing.sku|default:"—" }}</td>
+                  <td>
+                    {{ ing.stock|floatformat:2 }} {{ ing.unit }}
+                    {% if ing.stock <= 0 %}<span class="status red">out</span>
+                    {% elif ing.is_low %}<span class="status amber">low</span>{% endif %}
+                  </td>
+                  <td class="muted small">{{ ing.reorder_level|floatformat:2 }}</td>
+                  <td>{{ currency_symbol }}{{ ing.value|floatformat:2 }}</td>
+                  <td class="muted small">{{ ing.supplier.name|default:"—" }}</td>
+                  <td><a href="{% url 'inventory:detail' ing.pk %}" class="btn btn-ghost btn-sm">Manage</a></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="7" class="muted small">No ingredients yet. Add your first one to start tracking stock.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="card panel">
+          <h3>⚠️ Reorder soon</h3>
+          {% for ing in low_stock %}
+            <div class="flex between center" style="padding:.4rem 0;border-bottom:1px solid var(--line)">
+              <span class="small"><a href="{% url 'inventory:detail' ing.pk %}">{{ ing.name }}</a></span>
+              <span class="status amber">{{ ing.stock|floatformat:2 }} {{ ing.unit }}</span>
+            </div>
+          {% empty %}<p class="muted small">Stock levels healthy.</p>{% endfor %}
+        </div>
+        <div class="card panel">
+          <div class="flex between center mb-2"><h3>Recent movements</h3><a href="{% url 'inventory:movements' %}" class="btn btn-ghost btn-sm">Ledger</a></div>
+          {% for m in recent_movements %}
+            <div class="flex between center" style="padding:.4rem 0;border-bottom:1px solid var(--line)">
+              <span class="small">{% if m.ingredient %}{{ m.ingredient.name }}{% elif m.product %}{{ m.product.name }}{% else %}—{% endif %} · {{ m.get_kind_display }}</span>
+              <span class="small {% if m.quantity < 0 %}muted{% endif %}">{{ m.quantity|floatformat:2 }} {{ m.unit }}</span>
+            </div>
+          {% empty %}<p class="muted small">No movements recorded.</p>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

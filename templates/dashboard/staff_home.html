@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Staff Board — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    {% include "dashboard/_staff_nav.html" with nav="ops" %}
+    <div>
+      <span class="eyebrow">Live operations</span>
+      <h1 style="font-size:1.9rem">Staff board</h1>
+      <div class="metric-grid mt-3">
+        <div class="card metric"><div class="label">Active orders</div><div class="value">{{ today_orders }}</div></div>
+        <div class="card metric"><div class="label">Revenue today</div><div class="value">{{ currency_symbol }}{{ revenue_today|floatformat:2 }}</div></div>
+        <div class="card metric"><div class="label">Today's bookings</div><div class="value">{{ today_reservations|length }}</div></div>
+        <div class="card metric"><div class="label">Reviews to check</div><div class="value">{{ pending_reviews }}</div></div>
+      </div>
+
+      <div class="card panel mt-3">
+        <h3>🔔 New orders awaiting confirmation</h3>
+        {% for order in new_orders %}
+          <div class="order-mini flex between center">
+            <div>
+              <strong>{{ order.number }}</strong> · {{ order.customer_name }}<br>
+              <span class="muted small">{{ order.item_count }} items · {{ currency_symbol }}{{ order.total|floatformat:2 }} · {{ order.get_fulfillment_display }}</span>
+            </div>
+            <form method="post" action="{% url 'dashboard:staff_update_status' order.number %}" class="flex gap-sm">
+              {% csrf_token %}
+              <button name="status" value="confirmed" class="btn btn-sm">Accept</button>
+              <button name="status" value="cancelled" class="btn btn-ghost btn-sm">Cancel</button>
+            </form>
+          </div>
+        {% empty %}<p class="muted small">No new orders right now. ☕</p>{% endfor %}
+      </div>
+
+      <div class="card panel">
+        <div class="flex between center mb-2"><h3>Orders in progress</h3><a href="{% url 'dashboard:staff_orders' %}" class="btn btn-ghost btn-sm">All orders</a></div>
+        {% if active_orders %}
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Update</th></tr></thead>
+            <tbody>
+              {% for order in active_orders %}
+                <tr>
+                  <td><strong>{{ order.number }}</strong></td>
+                  <td>{{ order.customer_name }}</td>
+                  <td>{{ order.item_count }}</td>
+                  <td>{{ currency_symbol }}{{ order.total|floatformat:2 }}</td>
+                  <td><span class="status {{ order.status_color }}">{{ order.get_status_display }}</span></td>
+                  <td>
+                    <form method="post" action="{% url 'dashboard:staff_update_status' order.number %}" class="flex gap-sm">
+                      {% csrf_token %}
+                      <select name="status" class="form-select" data-autosubmit style="min-width:150px">
+                        {% for value, label in statuses %}<option value="{{ value }}" {% if order.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                      </select>
+                      <button class="btn btn-sm">Set</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}<p class="muted small">Nothing in progress.</p>{% endif %}
+      </div>
+
+      <div class="grid grid-2">
+        <div class="card panel">
+          <h3>Today's reservations</h3>
+          {% for r in today_reservations %}
+            <div class="flex between center" style="padding:.5rem 0;border-bottom:1px solid var(--line)">
+              <span class="small"><strong>{{ r.time|time:"g:i A" }}</strong> · {{ r.name }} ({{ r.party_size }})</span>
+              <span class="status amber">{{ r.get_status_display }}</span>
+            </div>
+          {% empty %}<p class="muted small">No reservations today.</p>{% endfor %}
+        </div>
+        <div class="card panel">
+          <h3>Low stock alerts</h3>
+          {% for p in low_stock %}
+            <div class="flex between center" style="padding:.4rem 0;border-bottom:1px solid var(--line)">
+              <span class="small">{{ p.name }}</span>
+              <span class="status red">{{ p.stock }} left</span>
+            </div>
+          {% empty %}<p class="muted small">Stock levels healthy.</p>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

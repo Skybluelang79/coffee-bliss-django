@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Sign in — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="card auth-card reveal">
+    <span class="eyebrow">Welcome back</span>
+    <h1>Sign in to <span class="gradient-text">Coffee Bliss</span></h1>
+    <p class="small mb-3">Your orders, loyalty beans and favorites are waiting.</p>
+    <form method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="message error mb-2">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="field">{{ form.username.label_tag }}{{ form.username }}{{ form.username.errors }}</div>
+      <div class="field">{{ form.password.label_tag }}{{ form.password }}{{ form.password.errors }}</div>
+      <label class="flex center gap-sm mb-2"><input type="checkbox" name="remember_me" class="form-check" checked /> Remember me</label>
+      <button class="btn btn-block">Sign in</button>
+      <input type="hidden" name="next" value="{{ next }}" />
+    </form>
+    <p class="small mt-2">New here? <a href="{% url 'accounts:signup' %}" class="gradient-text">Create a free account</a></p>
+  </div>
+</div>
+{% endblock %}

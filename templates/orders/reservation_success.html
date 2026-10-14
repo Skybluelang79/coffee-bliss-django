@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Reservation requested — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="block" style="padding-top:3rem">
+  <div class="container" style="max-width:640px;text-align:center">
+    <div style="font-size:4rem">🗓️</div>
+    <span class="eyebrow">Reservation requested</span>
+    <h1>See you soon, {{ reservation.name }}!</h1>
+    <p class="lead">We've received your table request for <strong class="gradient-text">{{ reservation.date }} at {{ reservation.time }}</strong> for {{ reservation.party_size }} guest{{ reservation.party_size|pluralize }}.</p>
+    <div class="card panel mt-3" style="text-align:left">
+      <div class="summary-row"><span>Name</span><span>{{ reservation.name }}</span></div>
+      <div class="summary-row"><span>Date</span><span>{{ reservation.date }}</span></div>
+      <div class="summary-row"><span>Time</span><span>{{ reservation.time }}</span></div>
+      <div class="summary-row"><span>Guests</span><span>{{ reservation.party_size }}</span></div>
+      {% if reservation.location %}<div class="summary-row"><span>Location</span><span>{{ reservation.location }}</span></div>{% endif %}
+      <div class="summary-row"><span>Status</span><span class="status amber">{{ reservation.get_status_display }}</span></div>
+    </div>
+    <a href="{% url 'store:home' %}" class="btn mt-3">Back to home</a>
+  </div>
+</section>
+{% endblock %}

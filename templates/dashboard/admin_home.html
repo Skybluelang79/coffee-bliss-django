@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Analytics — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    <aside class="dash-nav">
+      <a href="{% url 'dashboard:admin_home' %}" class="active">📊 Analytics</a>
+      <a href="{% url 'dashboard:customers' %}">👥 Customers</a>
+      <a href="{% url 'dashboard:reports' %}">📈 Reports</a>
+      <a href="{% url 'dashboard:staff_orders' %}">🧾 Orders</a>
+      <a href="/django-admin/">⚙️ Django admin</a>
+    </aside>
+    <div>
+      <span class="eyebrow">Executive overview</span>
+      <h1 style="font-size:1.9rem">Business dashboard</h1>
+
+      <div class="metric-grid mt-3">
+        <div class="card metric"><div class="label">Revenue (30 days)</div><div class="value">{{ currency_symbol }}{{ revenue_30d|floatformat:2 }}</div></div>
+        <div class="card metric"><div class="label">Total revenue</div><div class="value">{{ currency_symbol }}{{ total_revenue|floatformat:2 }}</div></div>
+        <div class="card metric"><div class="label">Orders (30 days)</div><div class="value">{{ orders_30d }}</div><div class="delta">of {{ orders_total }} all-time</div></div>
+        <div class="card metric"><div class="label">Avg order value</div><div class="value">{{ currency_symbol }}{{ aov|floatformat:2 }}</div></div>
+        <div class="card metric"><div class="label">Customers</div><div class="value">{{ customers }}</div><div class="delta">+{{ new_customers_30d }} this month</div></div>
+        <div class="card metric"><div class="label">Subscribers</div><div class="value">{{ subscribers }}</div></div>
+      </div>
+
+      <div class="card panel mt-3">
+        <div class="flex between center"><h3>Revenue — last 30 days</h3><span class="pill-note">Total {{ currency_symbol }}{{ revenue_30d|floatformat:2 }}</span></div>
+        <div class="chart-bar">
+          {% for row in chart %}
+            <div class="bar" style="height:{% widthratio row.revenue max_revenue 200 %}px" title="{{ row.date }}: {{ currency_symbol }}{{ row.revenue }} ({{ row.orders }} orders)"></div>
+          {% endfor %}
+        </div>
+        <div class="flex between mt-1"><span class="muted small">{{ chart.0.date }}</span><span class="muted small">{% for row in chart|slice:"-1:" %}{{ row.date }}{% endfor %}</span></div>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="card panel">
+          <h3>Top sellers</h3>
+          {% for p in top_products %}
+            <div class="flex between center" style="padding:.5rem 0;border-bottom:1px solid var(--line)">
+              <span class="small">{{ forloop.counter }}. {{ p.name }}</span>
+              <span class="small"><strong>{{ p.sold }}</strong> sold · {{ currency_symbol }}{{ p.revenue|floatformat:0 }}</span>
+            </div>
+          {% empty %}<p class="muted small">No sales yet.</p>{% endfor %}
+        </div>
+        <div class="card panel">
+          <h3>Orders by status</h3>
+          {% for row in status_breakdown %}
+            <div class="flex between center" style="padding:.5rem 0;border-bottom:1px solid var(--line)">
+              <span class="small">{{ row.status|title }}</span>
+              <span class="status {{ row.status|default:'gray' }}">{{ row.count }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="card panel">
+          <div class="flex between center mb-1"><h3>Recent orders</h3><a href="{% url 'dashboard:staff_orders' %}" class="btn btn-ghost btn-sm">Manage</a></div>
+          {% for order in recent_orders %}
+            <div class="flex between center" style="padding:.45rem 0;border-bottom:1px solid var(--line)">
+              <span class="small">{{ order.number }} · {{ order.customer_name }}</span>
+              <span class="status {{ order.status_color }}">{{ order.get_status_display }}</span>
+            </div>
+          {% endfor %}
+        </div>
+        <div class="card panel">
+          <h3>Needs attention</h3>
+          <p class="small">🔔 {{ pending_reviews|length }} reviews awaiting approval</p>
+          <p class="small">📦 {{ low_stock|length }} products low on stock</p>
+          <p class="small">🗓️ {{ reservations_upcoming }} upcoming confirmed reservations</p>
+          <div class="chip-row mt-2">
+            <span class="pill-note">👥 {{ customers }} customers</span>
+            <span class="pill-note">🎟️ {{ coupons|length }} active coupons</span>
+          </div>
+        </div>
+      </div>
+
+      {% if pending_reviews %}
+      <div class="card panel">
+        <h3>Pending reviews</h3>
+        {% for review in pending_reviews %}
+          <div class="review">
+            <div class="flex between center"><strong>{{ review.product.name }}</strong><span class="stars small">{% for i in "12345"|make_list %}{% if forloop.counter <= review.rating %}★{% else %}☆{% endif %}{% endfor %}</span></div>
+            <p class="small">{{ review.body }}</p>
+            <span class="muted small">by {{ review.user.email }}</span>
+          </div>
+        {% endfor %}
+        <a href="/django-admin/store/review/" class="btn btn-ghost btn-sm mt-2">Moderate in Django admin</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

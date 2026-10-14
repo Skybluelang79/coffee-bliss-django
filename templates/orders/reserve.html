@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Reserve a Table — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="block" style="padding-top:2.5rem">
+  <div class="container">
+    <div class="grid grid-2" style="align-items:start;gap:3rem">
+      <div class="reveal">
+        <span class="eyebrow">Book a table</span>
+        <h1>Reserve your <span class="gradient-text">cozy corner</span></h1>
+        <p>Whether it's a quiet morning espresso or a catch-up with friends, we'll have a spot ready for you.</p>
+        <div class="card panel mt-3">
+          <h3>Good to know</h3>
+          <p class="small">• Reservations are held for 15 minutes past the booking time.</p>
+          <p class="small">• For parties larger than 8, please call us directly.</p>
+          <p class="small">• We'll send a confirmation once a barista reviews your booking.</p>
+        </div>
+      </div>
+      <form method="post" class="card panel reveal">
+        {% csrf_token %}
+        <div class="form-grid">
+          <div class="field">{{ form.name.label_tag }}{{ form.name }}{{ form.name.errors }}</div>
+          <div class="field">{{ form.email.label_tag }}{{ form.email }}{{ form.email.errors }}</div>
+        </div>
+        <div class="form-grid">
+          <div class="field">{{ form.phone.label_tag }}{{ form.phone }}{{ form.phone.errors }}</div>
+          <div class="field">{{ form.location.label_tag }}{{ form.location }}</div>
+        </div>
+        <div class="form-grid">
+          <div class="field">{{ form.date.label_tag }}{{ form.date }}{{ form.date.errors }}</div>
+          <div class="field">{{ form.time.label_tag }}{{ form.time }}{{ form.time.errors }}</div>
+        </div>
+        <div class="field">{{ form.party_size.label_tag }}{{ form.party_size }}{{ form.party_size.errors }}</div>
+        <div class="field">{{ form.note.label_tag }}{{ form.note }}</div>
+        <button class="btn btn-block">Request reservation</button>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Coffee Bliss — Craft Coffee, Reimagined in 3D{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <canvas id="hero-canvas"></canvas>
+  <div class="hero-orb orb-a"></div>
+  <div class="hero-orb orb-b"></div>
+
+  <div class="container hero-grid">
+    <div class="hero-copy">
+      <span class="eyebrow">Small-batch · Freshly roasted · Delivered</span>
+      <h1>Your daily cup of <span class="gradient-text">pure bliss</span>, poured in 3D.</h1>
+      <p class="lead">Explore single-origin beans, handcrafted espresso and cozy café moments — all from a beautifully immersive ordering experience built for coffee lovers.</p>
+      <div class="hero-cta">
+        <a href="{% url 'store:menu' %}" class="btn">Order now →</a>
+        <a href="{% url 'store:subscriptions' %}" class="btn btn-ghost">Join the Coffee Club</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><b>{{ stats.products }}+</b><span>Menu items</span></div>
+        <div class="stat"><b>{{ stats.avg_rating }}★</b><span>Avg rating</span></div>
+        <div class="stat"><b>{{ stats.locations }}</b><span>Cafés</span></div>
+        <div class="stat"><b>2M+</b><span>Cups poured</span></div>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="hero-card-3d">
+        {% if hero_image %}
+          <img src="{{ hero_image }}" alt="Coffee Bliss signature cup" />
+        {% else %}
+          <div class="hero-placeholder" style="aspect-ratio:4/3.4;border-radius:20px;background:radial-gradient(circle at 50% 30%, #3a2418, #150d09);display:grid;place-items:center;">
+            <span style="font-size:5rem;filter:drop-shadow(0 20px 30px rgba(0,0,0,.5))">☕</span>
+          </div>
+        {% endif %}
+        <div class="float-chip chip-1">🔥 Freshly roasted</div>
+        <div class="float-chip chip-2">★ 4.9 from {{ stats.reviews }} reviews</div>
+        <div class="float-chip chip-3">🚚 Free delivery over ${{ free_delivery_threshold|floatformat:0 }}</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="container">
+    <div class="section-head reveal">
+      <div>
+        <span class="eyebrow">Browse the brews</span>
+        <h2>Find your perfect cup</h2>
+      </div>
+      <a href="{% url 'store:menu' %}" class="btn btn-ghost btn-sm">View full menu →</a>
+    </div>
+    <div class="grid grid-4">
+      {% for category in categories %}
+        <a href="{{ category.get_absolute_url }}" class="card reveal" data-tilt style="padding:1.4rem;text-align:center">
+          <div style="font-size:2.6rem">{{ category.icon|default:"☕" }}</div>
+          <h3 class="mt-1" style="font-size:1.1rem">{{ category.name }}</h3>
+          <p class="small">{{ category.product_count }} items</p>
+        </a>
+      {% empty %}
+        <p class="muted">Categories coming soon.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="block" style="background:linear-gradient(180deg, transparent, rgba(200,150,62,.04), transparent)">
+  <div class="container">
+    <div class="section-head reveal">
+      <div>
+        <span class="eyebrow">Loved by the community</span>
+        <h2>Featured favorites</h2>
+        <p>Hand-picked drinks and beans our regulars can't stop ordering.</p>
+      </div>
+    </div>
+    <div class="grid grid-4">
+      {% for product in featured_products %}
+        {% include "store/_product_card.html" with product=product %}
+      {% empty %}
+        <p class="muted">No products yet — add some in the admin!</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="container">
+    <div class="section-head reveal">
+      <div>
+        <span class="eyebrow">Coffee Club</span>
+        <h2>Never run out of good coffee</h2>
+        <p>Subscribe and get freshly roasted beans delivered on your schedule — save up to 20%.</p>
+      </div>
+      <a href="{% url 'store:subscriptions' %}" class="btn btn-ghost btn-sm">Compare plans →</a>
+    </div>
+    <div class="grid grid-3">
+      {% for plan in plans %}
+        <div class="card plan reveal {% if plan.is_popular %}popular{% endif %}">
+          <span class="eyebrow">{{ plan.get_interval_display }}</span>
+          <h3>{{ plan.name }}</h3>
+          <p class="small">{{ plan.tagline }}</p>
+          <div class="amount">{{ currency_symbol }}{{ plan.price|floatformat:0 }}<span class="muted" style="font-size:1rem">/{{ plan.interval }}</span></div>
+          <ul>
+            {% for perk in plan.perk_list %}<li>{{ perk }}</li>{% endfor %}
+          </ul>
+          <a href="{% url 'store:subscriptions' %}" class="btn {% if not plan.is_popular %}btn-ghost{% endif %} btn-block">Choose plan</a>
+        </div>
+      {% empty %}
+        <p class="muted">Plans coming soon.</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% if testimonials %}
+<section class="block">
+  <div class="container">
+    <div class="section-head reveal"><div><span class="eyebrow">What people say</span><h2>Loved in every cup</h2></div></div>
+    <div class="grid grid-3">
+      {% for review in testimonials %}
+        <div class="card reveal" style="padding:1.5rem">
+          <div class="stars mb-1">{% for i in "12345"|make_list %}{% if forloop.counter <= review.rating %}★{% else %}☆{% endif %}{% endfor %}</div>
+          <p>"{{ review.body|truncatechars:140 }}"</p>
+          <div class="flex between center mt-2">
+            <strong class="small">{{ review.user.get_short_name }}</strong>
+            <span class="muted small">{{ review.product.name }}</span>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="block">
+  <div class="container">
+    <div class="card reveal" style="padding:3rem;text-align:center;background:radial-gradient(circle at 50% 0%, rgba(200,150,62,.18), transparent 60%), linear-gradient(160deg, var(--surface), var(--bg-2))">
+      <span class="eyebrow">Ready when you are</span>
+      <h2 class="mt-1">Let's make today delicious</h2>
+      <p style="max-width:36rem;margin:1rem auto 2rem">Join thousands of coffee lovers. Order in minutes, earn loyalty beans on every cup, and taste the difference of truly fresh roast.</p>
+      <div class="flex gap center wrap" style="justify-content:center">
+        <a href="{% url 'store:menu' %}" class="btn">Start your order</a>
+        <a href="{% url 'accounts:signup' %}" class="btn btn-ghost">Create free account</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>window.heroImage = "{% if hero_image %}{{ hero_image }}{% endif %}";</script>
+<script src="{% static 'js/hero3d.js' %}"></script>
+{% endblock %}

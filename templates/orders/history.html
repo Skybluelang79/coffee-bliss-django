@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}My Orders — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    <aside class="dash-nav">
+      <a href="{% url 'accounts:dashboard' %}">🏠 Overview</a>
+      <a href="{% url 'accounts:profile' %}">👤 Profile</a>
+      <a href="{% url 'orders:history' %}" class="active">🧾 My orders</a>
+      <a href="{% url 'accounts:addresses' %}">📍 Addresses</a>
+    </aside>
+    <div>
+      <h1 style="font-size:1.9rem">Order history</h1>
+      {% if orders %}
+        <div class="table-wrap mt-2">
+          <table class="data">
+            <thead><tr><th>Order</th><th>Date</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              {% for order in orders %}
+                <tr>
+                  <td><strong>{{ order.number }}</strong><br><span class="muted small">{{ order.get_fulfillment_display }}</span></td>
+                  <td class="muted small">{{ order.created_at|date:"M d, Y" }}</td>
+                  <td>{{ order.item_count }}</td>
+                  <td>{{ currency_symbol }}{{ order.total|floatformat:2 }}</td>
+                  <td><span class="status {{ order.status_color }}">{{ order.get_status_display }}</span></td>
+                  <td class="flex gap-sm">
+                    <a class="btn btn-ghost btn-sm" href="{% url 'orders:track' order.number %}">Track</a>
+                    <a class="btn btn-ghost btn-sm" href="{% url 'accounts:order_detail' order.number %}">Details</a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty card mt-2"><div class="big">📦</div><h3>No orders yet</h3><a href="{% url 'store:menu' %}" class="btn mt-2">Start ordering</a></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

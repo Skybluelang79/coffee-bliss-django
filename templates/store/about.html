@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Our Story — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="hero" style="min-height:auto;padding:4rem 0">
+  <div class="hero-orb orb-a"></div>
+  <div class="container" style="position:relative;z-index:2">
+    <span class="eyebrow">Since 2016</span>
+    <h1>We're obsessed with the <span class="gradient-text">perfect cup</span></h1>
+    <p class="lead" style="max-width:46rem">What started as a tiny roastery in a garage is now a community of coffee lovers. We source directly from farmers, roast in small batches, and pour every cup like it matters — because it does.</p>
+  </div>
+</section>
+
+<section class="block">
+  <div class="container grid grid-3">
+    <div class="card panel reveal"><h3>Sourced with care</h3><p>Direct-trade relationships with growers across Ethiopia, Colombia and Guatemala.</p></div>
+    <div class="card panel reveal"><h3>Roasted fresh</h3><p>Small-batch roasting daily, so your beans reach peak flavour right on time.</p></div>
+    <div class="card panel reveal"><h3>Poured with love</h3><p>Expert baristas who treat every cup as a little act of hospitality.</p></div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="container">
+    <div class="section-head reveal"><div><span class="eyebrow">Visit us</span><h2>Our cafés</h2></div></div>
+    <div class="grid grid-3">
+      {% for location in locations %}
+        <div class="card reveal" style="padding:1.5rem">
+          <h3>{{ location.name }}</h3>
+          <p class="small">{{ location.address }}, {{ location.city }}</p>
+          <p class="small muted">{{ location.opening_hours }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

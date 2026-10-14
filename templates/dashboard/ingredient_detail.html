@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}{{ ingredient.name }} — Inventory — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    {% include "dashboard/_staff_nav.html" with nav="inventory" %}
+    <div>
+      <div class="flex between center">
+        <div>
+          <span class="eyebrow">Ingredient</span>
+          <h1 style="font-size:1.9rem">{{ ingredient.name }}</h1>
+        </div>
+        <div class="flex gap-sm">
+          <a href="{% url 'inventory:edit' ingredient.pk %}" class="btn btn-ghost btn-sm">Edit</a>
+          <a href="{% url 'inventory:home' %}" class="btn btn-ghost btn-sm">← Inventory</a>
+        </div>
+      </div>
+
+      <div class="metric-grid mt-3">
+        <div class="card metric"><div class="label">On hand</div><div class="value">{{ ingredient.stock|floatformat:2 }} {{ ingredient.unit }}</div></div>
+        <div class="card metric"><div class="label">Reorder level</div><div class="value">{{ ingredient.reorder_level|floatformat:2 }}</div></div>
+        <div class="card metric"><div class="label">Par level</div><div class="value">{{ ingredient.par_level|floatformat:2 }}</div></div>
+        <div class="card metric"><div class="label">Value</div><div class="value">{{ currency_symbol }}{{ ingredient.value|floatformat:2 }}</div></div>
+      </div>
+
+      {% if ingredient.is_low %}
+        <div class="alert alert-warn mt-2">⚠️ This ingredient is at or below its reorder level. Suggested reorder: {{ ingredient.suggested_order_quantity|floatformat:2 }} {{ ingredient.unit }}.</div>
+      {% endif %}
+
+      <div class="grid grid-3 mt-3">
+        <div class="card panel">
+          <h3>➕ Restock</h3>
+          <form method="post" action="{% url 'inventory:restock' ingredient.pk %}">
+            {% csrf_token %}
+            {{ restock_form.as_p }}
+            <button class="btn btn-sm btn-block">Add stock</button>
+          </form>
+        </div>
+        <div class="card panel">
+          <h3>✏️ Adjust to count</h3>
+          <form method="post" action="{% url 'inventory:adjust' ingredient.pk %}">
+            {% csrf_token %}
+            {{ adjust_form.as_p }}
+            <button class="btn btn-sm btn-ghost btn-block">Set stock</button>
+          </form>
+        </div>
+        <div class="card panel">
+          <h3>🗑️ Record waste</h3>
+          <form method="post" action="{% url 'inventory:waste' ingredient.pk %}">
+            {% csrf_token %}
+            {{ waste_form.as_p }}
+            <button class="btn btn-sm btn-ghost btn-block">Log waste</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card panel mt-3">
+        <h3>Movement history</h3>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>When</th><th>Kind</th><th>Qty</th><th>Reason</th><th>By</th><th>Order</th></tr></thead>
+            <tbody>
+              {% for m in movements %}
+                <tr>
+                  <td class="muted small">{{ m.created_at|date:"M j, H:i" }}</td>
+                  <td><span class="status gray">{{ m.get_kind_display }}</span></td>
+                  <td class="{% if m.quantity < 0 %}muted{% endif %}">{{ m.quantity|floatformat:2 }} {{ m.unit }}</td>
+                  <td class="small">{{ m.reason|default:"—" }}</td>
+                  <td class="muted small">{{ m.created_by.get_short_name|default:"system" }}</td>
+                  <td class="muted small">{{ m.order.number|default:"—" }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="6" class="muted small">No movements yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {% if ingredient.recipe_items.all %}
+      <div class="card panel">
+        <h3>Used in recipes</h3>
+        {% for r in ingredient.recipe_items.all %}
+          <div class="flex between center" style="padding:.4rem 0;border-bottom:1px solid var(--line)">
+            <span class="small">{{ r.product.name }}</span>
+            <span class="status gray">{{ r.quantity|floatformat:2 }} {{ ingredient.unit }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

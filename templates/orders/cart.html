@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Your Cart — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="block" style="padding-top:2.5rem">
+  <div class="container">
+    <span class="eyebrow">Your bag</span>
+    <h1>Cart</h1>
+
+    {% if cart_count %}
+    <div class="cart-layout mt-3">
+      <div class="card">
+        {% for line in cart %}
+          <div class="cart-item">
+            <div class="cart-thumb">
+              {% if line.product.image %}<img src="{{ line.product.image.url }}" alt="{{ line.product.name }}" />{% else %}{{ line.product.category.icon|default:"☕" }}{% endif %}
+            </div>
+            <div>
+              <strong><a href="{{ line.product.get_absolute_url }}">{{ line.product.name }}</a></strong>
+              <p class="small muted">{{ line.product.category.name }}{% if line.options.size %} · {{ line.options.size }}{% endif %}{% if line.options.milk %} · {{ line.options.milk }} milk{% endif %}</p>
+              <span class="price" style="font-size:1rem">{{ currency_symbol }}{{ line.unit_price|floatformat:2 }}</span>
+            </div>
+            <div class="col flex gap-sm" style="align-items:flex-end">
+              <form method="post" action="{% url 'orders:cart_update' line.product.id %}" class="flex gap-sm center">
+                {% csrf_token %}
+                <input type="number" name="quantity" value="{{ line.quantity }}" min="0" max="50" class="form-input qty-input" data-autosubmit />
+              </form>
+              <form method="post" action="{% url 'orders:cart_remove' line.product.id %}">
+                {% csrf_token %}
+                <button class="btn btn-ghost btn-sm" style="color:var(--danger)">Remove</button>
+              </form>
+              <strong>{{ currency_symbol }}{{ line.line_total|floatformat:2 }}</strong>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="card panel">
+        <h3>Order summary</h3>
+        <div class="summary-row"><span>Subtotal</span><span>{{ currency_symbol }}{{ cart.subtotal|floatformat:2 }}</span></div>
+        {% if cart.discount %}<div class="summary-row"><span>Promo discount</span><span style="color:var(--success)">-{{ currency_symbol }}{{ cart.discount|floatformat:2 }}</span></div>{% endif %}
+        <div class="summary-row"><span>Delivery</span><span>{% if cart.delivery_fee %}{{ currency_symbol }}{{ cart.delivery_fee|floatformat:2 }}{% else %}Free{% endif %}</span></div>
+        <div class="summary-row"><span>Tax</span><span>{{ currency_symbol }}{{ cart.tax|floatformat:2 }}</span></div>
+        {% if cart.loyalty_discount %}<div class="summary-row"><span>Loyalty ({{ cart.points_used }})</span><span style="color:var(--success)">-{{ currency_symbol }}{{ cart.loyalty_discount|floatformat:2 }}</span></div>{% endif %}
+        <div class="summary-row total"><span>Total</span><span>{{ currency_symbol }}{{ cart.grand_total|floatformat:2 }}</span></div>
+
+        {% if cart.to_free_delivery %}
+          <p class="small muted mt-1">Add {{ currency_symbol }}{{ cart.to_free_delivery|floatformat:2 }} more for free delivery 🚚</p>
+          <div class="progress"><div class="bar" style="width:{% widthratio cart.subtotal free_delivery_threshold 100 %}%"></div></div>
+        {% endif %}
+
+        <form method="post" action="{% url 'orders:apply_coupon' %}" class="flex gap-sm mt-2">
+          {% csrf_token %}
+          <input type="text" name="code" class="form-input" placeholder="Promo code" value="{{ cart.get_coupon.code|default:'' }}" />
+          <button class="btn btn-ghost">Apply</button>
+        </form>
+
+        <a href="{% url 'orders:checkout' %}" class="btn btn-block mt-3">Proceed to checkout →</a>
+        <a href="{% url 'store:menu' %}" class="btn btn-ghost btn-block mt-1">Continue shopping</a>
+      </div>
+    </div>
+    {% else %}
+      <div class="empty card mt-3">
+        <div class="big">🛒</div>
+        <h2>Your cart is empty</h2>
+        <p>Time to fill it with something delicious.</p>
+        <a href="{% url 'store:menu' %}" class="btn mt-2">Browse the menu</a>
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

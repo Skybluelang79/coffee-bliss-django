@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Recipes — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    {% include "dashboard/_staff_nav.html" with nav="recipes" %}
+    <div>
+      <span class="eyebrow">Bill of materials</span>
+      <h1 style="font-size:1.9rem">Recipes</h1>
+      <p class="muted small">Link each menu item to the ingredients it consumes. Stock is deducted automatically on every sale.</p>
+      <div class="card panel mt-3">
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Product</th><th>Track stock</th><th>Recipe lines</th><th></th></tr></thead>
+            <tbody>
+              {% for p in products %}
+                <tr>
+                  <td><strong>{{ p.name }}</strong></td>
+                  <td>{% if p.track_stock %}<span class="status green">on</span>{% else %}<span class="status gray">off</span>{% endif %}</td>
+                  <td class="small">{{ p.recipe_items.all|length }} ingredient{{ p.recipe_items.all|length|pluralize }}</td>
+                  <td><a href="{% url 'inventory:recipe_edit' p.slug %}" class="btn btn-ghost btn-sm">Edit recipe</a></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="muted small">No active products.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

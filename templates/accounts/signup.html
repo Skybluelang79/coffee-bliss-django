@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Join — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="card auth-card reveal" style="width:min(560px,94vw)">
+    <span class="eyebrow">Join the club</span>
+    <h1>Create your account</h1>
+    <p class="small mb-3">Get <strong>100 free loyalty beans</strong> when you sign up.</p>
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-grid">
+        <div class="field">{{ form.first_name.label_tag }}{{ form.first_name }}{{ form.first_name.errors }}</div>
+        <div class="field">{{ form.last_name.label_tag }}{{ form.last_name }}{{ form.last_name.errors }}</div>
+      </div>
+      <div class="field">{{ form.email.label_tag }}{{ form.email }}{{ form.email.errors }}</div>
+      <div class="field">{{ form.phone.label_tag }}{{ form.phone }}{{ form.phone.errors }}</div>
+      <div class="form-grid">
+        <div class="field">{{ form.password1.label_tag }}{{ form.password1 }}{{ form.password1.errors }}</div>
+        <div class="field">{{ form.password2.label_tag }}{{ form.password2 }}{{ form.password2.errors }}</div>
+      </div>
+      <label class="flex center gap-sm mb-2"><input type="checkbox" name="newsletter_opt_in" class="form-check" checked /> Email me brew news & offers</label>
+      <button class="btn btn-block">Create account</button>
+    </form>
+    <p class="small mt-2">Already have an account? <a href="{% url 'accounts:login' %}" class="gradient-text">Sign in</a></p>
+  </div>
+</div>
+{% endblock %}

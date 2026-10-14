@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Profile — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    <aside class="dash-nav">
+      <a href="{% url 'accounts:dashboard' %}">🏠 Overview</a>
+      <a href="{% url 'accounts:profile' %}" class="active">👤 Profile</a>
+      <a href="{% url 'orders:history' %}">🧾 My orders</a>
+      <a href="{% url 'accounts:addresses' %}">📍 Addresses</a>
+      <a href="{% url 'accounts:password_change' %}">🔒 Password</a>
+    </aside>
+    <div>
+      <h1 style="font-size:1.9rem">Profile settings</h1>
+      <form method="post" enctype="multipart/form-data" class="card panel mt-2" style="max-width:640px">
+        {% csrf_token %}
+        <div class="flex center gap" style="margin-bottom:1rem">
+          {% if user.avatar %}<img src="{{ user.avatar.url }}" style="width:72px;height:72px;border-radius:50%;object-fit:cover" />
+          {% else %}<div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--brand-2),var(--brand-3));display:grid;place-items:center;font-size:2rem">☕</div>{% endif %}
+          <div><strong>{{ user.email }}</strong><br><span class="muted small">{{ user.get_role_display }} · {{ user.loyalty_points }} beans</span></div>
+        </div>
+        <div class="form-grid">
+          <div class="field">{{ form.first_name.label_tag }}{{ form.first_name }}</div>
+          <div class="field">{{ form.last_name.label_tag }}{{ form.last_name }}</div>
+        </div>
+        <div class="field">{{ form.phone.label_tag }}{{ form.phone }}</div>
+        <div class="field">{{ form.avatar.label_tag }}{{ form.avatar }}</div>
+        <label class="flex center gap-sm mb-1"><input type="checkbox" class="form-check" name="newsletter_opt_in" {% if user.newsletter_opt_in %}checked{% endif %} /> Email newsletter</label>
+        <label class="flex center gap-sm mb-2"><input type="checkbox" class="form-check" name="marketing_opt_in" {% if user.marketing_opt_in %}checked{% endif %} /> Personalised offers</label>
+        <button class="btn">Save changes</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

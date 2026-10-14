@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}{{ product.name }} — {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}{{ product.short_description|default:product.description|truncatechars:150 }}{% endblock %}
+
+{% block content %}
+<section class="block" style="padding-top:2.5rem">
+  <div class="container">
+    <p class="small muted"><a href="{% url 'store:menu' %}">Menu</a> / <a href="{{ product.category.get_absolute_url }}">{{ product.category.name }}</a> / {{ product.name }}</p>
+
+    <div class="pd-grid mt-2">
+      <div class="pd-media reveal">
+        {% if product.image %}
+          <img src="{{ product.image.url }}" alt="{{ product.name }}" />
+        {% else %}
+          <div style="display:grid;place-items:center;height:100%;font-size:7rem">{{ product.category.icon|default:"☕" }}</div>
+        {% endif %}
+      </div>
+
+      <div class="reveal">
+        <div class="flex between center">
+          <span class="eyebrow">{{ product.category.name }}</span>
+          <div class="flex gap-sm center">
+            {% if product.is_new %}<span class="badge new">New</span>{% endif %}
+            {% if product.is_featured %}<span class="badge">Featured</span>{% endif %}
+          </div>
+        </div>
+        <h1 style="font-size:clamp(1.9rem,4vw,2.8rem)">{{ product.name }}</h1>
+        <div class="flex gap center mb-2">
+          {% if product.rating_display %}
+            <span class="stars">★★★★★</span>
+            <span class="muted small">{{ product.rating_display }} · {{ product.review_count }} review{{ product.review_count|pluralize }}</span>
+          {% else %}
+            <span class="muted small">Be the first to review</span>
+          {% endif %}
+        </div>
+        <p>{{ product.description|default:product.short_description }}</p>
+
+        <div class="pd-price mt-2">{{ currency_symbol }}{{ product.price|floatformat:2 }}
+          {% if product.compare_at_price %}<s class="muted" style="font-size:1.2rem">{{ currency_symbol }}{{ product.compare_at_price|floatformat:2 }}</s>{% endif %}
+        </div>
+
+        <div class="flex gap-sm wrap mt-2">
+          {% if product.origin %}<span class="pill-note">🌍 {{ product.origin }}</span>{% endif %}
+          {% if product.roast != "na" %}<span class="pill-note">🔥 {{ product.get_roast_display }}</span>{% endif %}
+          {% if product.caffeine_mg %}<span class="pill-note">⚡ {{ product.caffeine_mg }}mg caffeine</span>{% endif %}
+          {% if product.calories %}<span class="pill-note">🍃 {{ product.calories }} cal</span>{% endif %}
+          <span class="pill-note">⏱ ~{{ product.prep_time_minutes }} min</span>
+        </div>
+
+        <form method="post" action="{% url 'orders:cart_add' product.id %}" class="mt-3">
+          {% csrf_token %}
+          {% if product.kind == "drink" %}
+          <div class="option-group">
+            <label>Size</label>
+            <div class="opts">
+              <label class="chip"><input type="radio" name="size" value="Small" class="form-check" checked /> Small</label>
+              <label class="chip"><input type="radio" name="size" value="Medium" class="form-check" /> Medium</label>
+              <label class="chip"><input type="radio" name="size" value="Large" class="form-check" /> Large</label>
+            </div>
+          </div>
+          <div class="option-group">
+            <label>Milk</label>
+            <div class="opts">
+              <label class="chip"><input type="radio" name="milk" value="Whole" class="form-check" checked /> Whole</label>
+              <label class="chip"><input type="radio" name="milk" value="Oat" class="form-check" /> Oat</label>
+              <label class="chip"><input type="radio" name="milk" value="Almond" class="form-check" /> Almond</label>
+              <label class="chip"><input type="radio" name="milk" value="Skim" class="form-check" /> Skim</label>
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="flex gap center wrap mt-2">
+            <div class="flex center gap-sm" data-qty>
+              <button type="button" class="btn btn-ghost btn-sm" data-qty-step="-1">−</button>
+              <input type="number" name="quantity" value="1" min="1" max="50" class="form-input qty-input" />
+              <button type="button" class="btn btn-ghost btn-sm" data-qty-step="1">+</button>
+            </div>
+            <button class="btn" name="add_to_cart" {% if not product.in_stock %}disabled{% endif %}>
+              {% if product.in_stock %}Add to cart · {{ currency_symbol }}{{ product.price|floatformat:2 }}{% else %}Sold out{% endif %}
+            </button>
+            <button class="btn btn-ghost" name="buy_now" value="1" {% if not product.in_stock %}disabled{% endif %}>Buy now</button>
+          </div>
+        </form>
+
+        {% if user.is_authenticated %}
+        <form method="post" action="{% url 'store:toggle_favorite' product.slug %}" class="mt-2">
+          {% csrf_token %}
+          <button class="btn btn-ghost btn-sm">{% if is_favorite %}♥ Saved to favorites{% else %}♡ Save to favorites{% endif %}</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if product.ingredients %}
+    <div class="card panel mt-4 reveal">
+      <h3>Ingredients</h3>
+      <p>{{ product.ingredients }}</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="block">
+  <div class="container">
+    <div class="grid grid-2" style="align-items:start">
+      <div class="card panel reveal">
+        <h3>Ratings & reviews</h3>
+        {% if product.rating_display %}
+          <div class="flex gap-lg center mb-2">
+            <div style="text-align:center">
+              <div style="font-family:var(--display);font-size:3rem">{{ product.rating_display }}</div>
+              <div class="stars">★★★★★</div>
+              <div class="muted small">{{ product.review_count }} reviews</div>
+            </div>
+            <div style="flex:1">
+              {% for row in rating_breakdown %}
+                <div class="rating-bar">
+                  <span>{{ row.stars }}★</span>
+                  <div class="track"><div class="fill" style="width:{{ row.percent }}%"></div></div>
+                  <span class="muted">{{ row.count }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+
+        {% if can_review %}
+          <form method="post" action="{% url 'store:add_review' product.slug %}" class="mt-3">
+            {% csrf_token %}
+            <label>Your rating</label>
+            <div class="opts mb-2">
+              {% for radio in review_form.rating %}
+                <label class="chip">{{ radio.tag }} {{ radio.choice_label }}</label>
+              {% endfor %}
+            </div>
+            <div class="field">{{ review_form.title }}</div>
+            <div class="field">{{ review_form.body }}</div>
+            <button class="btn">Submit review (+25 beans)</button>
+          </form>
+        {% elif user.is_authenticated %}
+          <p class="muted small mt-2">You've already reviewed this item. Thank you!</p>
+        {% else %}
+          <p class="small mt-2"><a href="{% url 'accounts:login' %}" class="gradient-text">Sign in</a> to leave a review.</p>
+        {% endif %}
+      </div>
+
+      <div class="reveal">
+        {% for review in reviews %}
+          <div class="review">
+            <div class="flex between center">
+              <strong>{{ review.user.get_short_name }}</strong>
+              <span class="stars small">{% for i in "12345"|make_list %}{% if forloop.counter <= review.rating %}★{% else %}☆{% endif %}{% endfor %}</span>
+            </div>
+            {% if review.is_verified_purchase %}<span class="pill-note small">✓ Verified purchase</span>{% endif %}
+            {% if review.title %}<p class="mt-1"><strong>{{ review.title }}</strong></p>{% endif %}
+            <p class="small">{{ review.body }}</p>
+            <span class="muted small">{{ review.created_at|naturaltime }}</span>
+          </div>
+        {% empty %}
+          <p class="muted">No reviews yet — be the first!</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% if related %}
+<section class="block">
+  <div class="container">
+    <div class="section-head reveal"><div><span class="eyebrow">You might also like</span><h2>Pairs well with</h2></div></div>
+    <div class="grid grid-4">
+      {% for product in related %}{% include "store/_product_card.html" with product=product %}{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Recipe: {{ product.name }} — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    {% include "dashboard/_staff_nav.html" with nav="recipes" %}
+    <div>
+      <div class="flex between center">
+        <div>
+          <span class="eyebrow">Recipe</span>
+          <h1 style="font-size:1.9rem">{{ product.name }}</h1>
+        </div>
+        <a href="{% url 'inventory:recipes' %}" class="btn btn-ghost btn-sm">← All recipes</a>
+      </div>
+
+      <div class="grid grid-2 mt-3">
+        <div class="card panel">
+          <h3>Ingredients on this recipe</h3>
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th>Ingredient</th><th>Quantity</th><th></th></tr></thead>
+              <tbody>
+                {% for item in items %}
+                  <tr>
+                    <td><a href="{% url 'inventory:detail' item.ingredient.pk %}">{{ item.ingredient.name }}</a></td>
+                    <td>{{ item.quantity|floatformat:3 }} {{ item.ingredient.unit }}</td>
+                    <td>
+                      <form method="post" action="{% url 'inventory:recipe_delete' product.slug item.pk %}">
+                        {% csrf_token %}
+                        <button class="btn btn-ghost btn-sm">Remove</button>
+                      </form>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="3" class="muted small">No ingredients linked yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="form-hint mt-2">Set the product's <strong>track stock</strong> flag in the admin to deduct these automatically on sale.</p>
+        </div>
+
+        <div class="card panel">
+          <h3>Add / update a line</h3>
+          <form method="post">
+            {% csrf_token %}
+            {% for field in form %}
+              <div class="field">
+                {{ field.label_tag }}{{ field }}
+                {{ field.errors }}
+              </div>
+            {% endfor %}
+            <button class="btn btn-sm mt-2">Save line</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

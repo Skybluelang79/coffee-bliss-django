@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Kitchen Display — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:none;padding-inline:2vw">
+  <div class="flex between center mt-3">
+    <div>
+      <span class="eyebrow">Kitchen display system</span>
+      <h1 style="font-size:1.7rem">Live order board</h1>
+    </div>
+    <div class="flex gap center">
+      <span class="pill-note" id="ws-status">● connecting…</span>
+      <span class="pill-note" id="clock">{{ now }}</span>
+      <a href="{% url 'dashboard:staff_home' %}" class="btn btn-ghost btn-sm">← Operations</a>
+    </div>
+  </div>
+
+  <div class="kds-board" id="kds-board">
+    <div class="kds-col" data-status="pending">
+      <h4>🔔 New <span class="kds-count" data-count="pending">0</span></h4>
+      <div class="kds-cards" data-cards="pending"></div>
+    </div>
+    <div class="kds-col" data-status="confirmed">
+      <h4>✅ Confirmed <span class="kds-count" data-count="confirmed">0</span></h4>
+      <div class="kds-cards" data-cards="confirmed"></div>
+    </div>
+    <div class="kds-col" data-status="preparing">
+      <h4>👨‍🍳 Preparing <span class="kds-count" data-count="preparing">0</span></h4>
+      <div class="kds-cards" data-cards="preparing"></div>
+    </div>
+    <div class="kds-col" data-status="ready">
+      <h4>🛎️ Ready <span class="kds-count" data-count="ready">0</span></h4>
+      <div class="kds-cards" data-cards="ready"></div>
+    </div>
+    <div class="kds-col" data-status="out_for_delivery">
+      <h4>🚚 Out for delivery <span class="kds-count" data-count="out_for_delivery">0</span></h4>
+      <div class="kds-cards" data-cards="out_for_delivery"></div>
+    </div>
+  </div>
+</div>
+
+{{ orders_json|json_script:"kds-seed" }}
+
+<template id="card-template">
+  <article class="kds-card">
+    <div class="kds-card-head">
+      <strong class="kds-number"></strong>
+      <span class="kds-timer"></span>
+    </div>
+    <div class="kds-meta"></div>
+    <ul class="kds-items"></ul>
+    <div class="kds-actions"></div>
+  </article>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const csrf = "{{ csrf_token }}";
+  const board = document.getElementById("kds-board");
+  const template = document.getElementById("card-template");
+  const statusEl = document.getElementById("ws-status");
+  const orders = {};
+
+  const NEXT = {
+    pending: [["confirmed", "Accept"]],
+    confirmed: [["preparing", "Start"]],
+    preparing: [["ready", "Ready"]],
+    ready: [["completed", "Complete"], ["out_for_delivery", "Dispatch"]],
+    out_for_delivery: [["completed", "Complete"]],
+  };
+
+  function bump(number, status) {
+    const form = document.createElement("form");
+    form.method = "post";
+    form.action = "/dashboard/staff/orders/" + number + "/status/";
+    form.style.display = "inline";
+    const c = document.createElement("input"); c.type = "hidden"; c.name = "csrfmiddlewaretoken"; c.value = csrf;
+    const s = document.createElement("input"); s.type = "hidden"; s.name = "status"; s.value = status;
+    form.appendChild(c); form.appendChild(s);
+    document.body.appendChild(form); form.submit();
+  }
+
+  function render(order) {
+    orders[order.number] = order;
+    const columns = ["pending", "confirmed", "preparing", "ready", "out_for_delivery"];
+    columns.forEach((col) => {
+      const wrap = board.querySelector('[data-cards="' + col + '"]');
+      wrap.innerHTML = "";
+      const list = Object.values(orders)
+        .filter((o) => o.status === col && o.active)
+        .sort((a, b) => (a.placed_at || "").localeCompare(b.placed_at || ""));
+      list.forEach((o) => wrap.appendChild(buildCard(o)));
+      board.querySelector('[data-count="' + col + '"]').textContent = list.length;
+    });
+  }
+
+  function buildCard(o) {
+    const node = document.importNode(template.content, true);
+    node.querySelector(".kds-number").textContent = "#" + o.number;
+    const timer = node.querySelector(".kds-timer");
+    timer.dataset.placed = o.placed_at || "";
+    updateTimer(timer);
+    node.querySelector(".kds-meta").textContent =
+      o.fulfillment + (o.location ? " · " + o.location : "") + " · " + o.customer;
+    const ul = node.querySelector(".kds-items");
+    o.items.forEach((it) => {
+      const li = document.createElement("li");
+      const opts = it.options && Object.keys(it.options).length
+        ? " (" + Object.values(it.options).flat().join(", ") + ")" : "";
+      li.innerHTML = "<b>" + it.quantity + "×</b> " + it.name + opts;
+      ul.appendChild(li);
+    });
+    if (o.note) {
+      const n = document.createElement("p");
+      n.className = "kds-note";
+      n.textContent = "📝 " + o.note;
+      node.querySelector(".kds-actions").before(n);
+    }
+    const actions = node.querySelector(".kds-actions");
+    (NEXT[o.status] || []).forEach(([status, label]) => {
+      const btn = document.createElement("button");
+      btn.className = "btn btn-sm";
+      btn.textContent = label;
+      btn.addEventListener("click", () => bump(o.number, status));
+      actions.appendChild(btn);
+    });
+    return node.firstElementChild;
+  }
+
+  function updateTimer(el) {
+    if (!el.dataset.placed) return;
+    const placed = new Date(el.dataset.placed);
+    const secs = Math.floor((Date.now() - placed.getTime()) / 1000);
+    const m = Math.floor(secs / 60), s = secs % 60;
+    el.textContent = m + "m " + String(s).padStart(2, "0") + "s";
+    el.classList.toggle("late", m >= 8);
+    el.classList.toggle("warn", m >= 4 && m < 8);
+  }
+
+  setInterval(() => {
+    document.querySelectorAll(".kds-timer").forEach(updateTimer);
+    const now = new Date();
+    document.getElementById("clock").textContent = now.toLocaleTimeString();
+  }, 1000);
+
+  // Seed from server-rendered data (so board isn't empty before first WS message).
+  JSON.parse(document.getElementById("kds-seed").textContent).forEach(render);
+
+  // WebSocket live feed
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  let ws, retry = 0;
+  function connect() {
+    ws = new WebSocket(proto + "://" + location.host + "/ws/kitchen/");
+    ws.onopen = () => { statusEl.textContent = "● live"; statusEl.classList.remove("offline"); retry = 0; };
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === "order.update" && msg.order) render(msg.order);
+    };
+    ws.onclose = () => {
+      statusEl.textContent = "● reconnecting…";
+      statusEl.classList.add("offline");
+      retry = Math.min(retry + 1, 6);
+      setTimeout(connect, retry * 1000);
+    };
+  }
+  connect();
+})();
+</script>
+{% endblock %}

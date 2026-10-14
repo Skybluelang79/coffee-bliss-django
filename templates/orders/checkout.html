@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Checkout — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="block" style="padding-top:2.5rem">
+  <div class="container">
+    <span class="eyebrow">Almost there</span>
+    <h1>Checkout</h1>
+
+    <form method="post" class="cart-layout mt-3">
+      {% csrf_token %}
+      <div>
+        <div class="card panel">
+          <h3>How would you like it?</h3>
+          <div class="chip-row mb-3" id="fulfillment-toggle">
+            {% for value, label in form.fulfillment.field.choices %}
+              <label class="chip {% if forloop.first %}active{% endif %}">
+                <input type="radio" name="fulfillment" value="{{ value }}" class="form-check" {% if forloop.first %}checked{% endif %} hidden />
+                {{ label }}
+              </label>
+            {% endfor %}
+          </div>
+
+          <div class="form-grid">
+            <div class="field">{{ form.customer_name.label_tag }}{{ form.customer_name }}{{ form.customer_name.errors }}</div>
+            <div class="field">{{ form.customer_phone.label_tag }}{{ form.customer_phone }}{{ form.customer_phone.errors }}</div>
+          </div>
+          <div class="field" id="location-field">{{ form.location.label_tag }}{{ form.location }}</div>
+          <div class="field" id="address-field">{{ form.delivery_address.label_tag }}{{ form.delivery_address }}{{ form.delivery_address.errors }}</div>
+          <div class="field">{{ form.note.label_tag }}{{ form.note }}</div>
+
+          {% if not user.is_authenticated %}
+            <div class="field">
+              <label>Email (for your receipt)</label>
+              <input type="email" name="guest_email" class="form-input" placeholder="you@example.com" required />
+              <p class="form-hint">Have an account? <a href="{% url 'accounts:login' %}" class="gradient-text">Sign in</a> to earn loyalty beans.</p>
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="card panel mt-2">
+          <h3>Payment</h3>
+          <label class="chip active" style="display:block;padding:1rem">
+            <input type="radio" name="payment_method" value="card" class="form-check" checked hidden />
+            💳 Credit / debit card
+          </label>
+          <label class="chip" style="display:block;padding:1rem;margin-top:.6rem">
+            <input type="radio" name="payment_method" value="cash" class="form-check" hidden />
+            💵 Pay at pickup / on delivery
+          </label>
+          <p class="form-hint mt-1">Card payments are processed securely by Stripe — a demo gateway is used when no keys are configured.</p>
+        </div>
+      </div>
+
+      <div class="card panel">
+        <h3>Your order</h3>
+        {% for line in cart %}
+          <div class="summary-row"><span>{{ line.quantity }} × {{ line.product.name }}</span><span>{{ currency_symbol }}{{ line.line_total|floatformat:2 }}</span></div>
+        {% endfor %}
+        <div class="summary-row mt-1"><span>Subtotal</span><span>{{ currency_symbol }}{{ cart.subtotal|floatformat:2 }}</span></div>
+        {% if cart.discount %}<div class="summary-row"><span>Discount</span><span style="color:var(--success)">-{{ currency_symbol }}{{ cart.discount|floatformat:2 }}</span></div>{% endif %}
+        <div class="summary-row"><span>Delivery</span><span>{% if cart.delivery_fee %}{{ currency_symbol }}{{ cart.delivery_fee|floatformat:2 }}{% else %}Free{% endif %}</span></div>
+        <div class="summary-row"><span>Tax</span><span>{{ currency_symbol }}{{ cart.tax|floatformat:2 }}</span></div>
+        {% if cart.loyalty_discount %}<div class="summary-row"><span>Loyalty</span><span style="color:var(--success)">-{{ currency_symbol }}{{ cart.loyalty_discount|floatformat:2 }}</span></div>{% endif %}
+        <div class="summary-row total"><span>Total</span><span>{{ currency_symbol }}{{ cart.grand_total|floatformat:2 }}</span></div>
+        <div class="field mt-2">{{ form.coupon_code }}{{ form.coupon_code.errors }}</div>
+        {% if user.is_authenticated and user.loyalty_points %}
+          <p class="pill-note small">You have {{ user.loyalty_points }} beans worth {{ currency_symbol }}{{ user.redeem_value|floatformat:2 }}</p>
+        {% endif %}
+        <button class="btn btn-block mt-2">Place order · {{ currency_symbol }}{{ cart.grand_total|floatformat:2 }}</button>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const radios = document.querySelectorAll('#fulfillment-toggle input');
+  const addr = document.getElementById('address-field');
+  const loc = document.getElementById('location-field');
+  function sync() {
+    const val = document.querySelector('#fulfillment-toggle input:checked').value;
+    addr.style.display = val === 'delivery' ? 'block' : 'none';
+    loc.style.display = val === 'delivery' ? 'none' : 'block';
+    document.querySelectorAll('#fulfillment-toggle .chip').forEach(c => c.classList.toggle('active', c.querySelector('input').checked));
+  }
+  radios.forEach(r => r.addEventListener('change', sync));
+  sync();
+  document.querySelectorAll('input[name="payment_method"]').forEach(r => {
+    r.addEventListener('change', () => document.querySelectorAll('input[name="payment_method"]').forEach(x => x.closest('.chip').classList.toggle('active', x.checked)));
+  });
+</script>
+{% endblock %}

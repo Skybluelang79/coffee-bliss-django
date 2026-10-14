@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Coffee Club — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="block" style="padding-top:2.5rem">
+  <div class="container">
+    <span class="eyebrow">The Coffee Club</span>
+    <h1>Fresh coffee, <span class="gradient-text">on repeat</span></h1>
+    <p class="lead">Choose a plan, pick your grind, and we'll roast and ship your beans at the perfect moment. Pause or cancel anytime.</p>
+    <div class="grid grid-3 mt-3">
+      {% for plan in plans %}
+        <div class="card plan reveal {% if plan.is_popular %}popular{% endif %}">
+          <span class="eyebrow">{{ plan.get_interval_display }}</span>
+          <h3>{{ plan.name }}</h3>
+          <p class="small">{{ plan.tagline }}</p>
+          <div class="amount">{{ currency_symbol }}{{ plan.price|floatformat:2 }}<span class="muted" style="font-size:1rem">/{{ plan.interval }}</span></div>
+          <p class="small">{{ plan.bags_per_delivery }} bag{{ plan.bags_per_delivery|pluralize }} per delivery</p>
+          <ul>{% for perk in plan.perk_list %}<li>{{ perk }}</li>{% endfor %}</ul>
+          {% if user.is_authenticated %}
+            <a href="{% url 'store:contact' %}" class="btn {% if not plan.is_popular %}btn-ghost{% endif %} btn-block">Subscribe</a>
+          {% else %}
+            <a href="{% url 'accounts:signup' %}" class="btn {% if not plan.is_popular %}btn-ghost{% endif %} btn-block">Join to subscribe</a>
+          {% endif %}
+        </div>
+      {% empty %}
+        <p class="muted">Plans coming soon.</p>
+      {% endfor %}
+    </div>
+    <div class="card panel mt-4 reveal">
+      <h3>How it works</h3>
+      <div class="grid grid-3 mt-2">
+        <div><h3 class="gradient-text">01</h3><p class="small">Pick your favourite plan and how often you want delivery.</p></div>
+        <div><h3 class="gradient-text">02</h3><p class="small">Tell us your grind — whole bean, espresso, filter or French press.</p></div>
+        <div><h3 class="gradient-text">03</h3><p class="small">We roast fresh and deliver right to your door. Skip or pause anytime.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

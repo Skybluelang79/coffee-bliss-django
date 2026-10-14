@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Addresses — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    <aside class="dash-nav">
+      <a href="{% url 'accounts:dashboard' %}">🏠 Overview</a>
+      <a href="{% url 'accounts:profile' %}">👤 Profile</a>
+      <a href="{% url 'accounts:addresses' %}" class="active">📍 Addresses</a>
+      <a href="{% url 'orders:history' %}">🧾 My orders</a>
+    </aside>
+    <div>
+      <h1 style="font-size:1.9rem">Addresses</h1>
+      <div class="grid grid-2 mt-2">
+        <div>
+          {% for address in addresses %}
+            <div class="card panel" style="padding:1.2rem;margin-bottom:1rem">
+              <div class="flex between center">
+                <strong>{{ address.get_label_display }} {% if address.is_default %}<span class="pill-note small">Default</span>{% endif %}</strong>
+                <form method="post" action="{% url 'accounts:address_delete' address.pk %}">{% csrf_token %}<button class="btn btn-ghost btn-sm">Remove</button></form>
+              </div>
+              <p class="small mt-1">{{ address.recipient }}</p>
+              <p class="small muted">{{ address.one_line }}</p>
+            </div>
+          {% empty %}<p class="muted">No addresses saved yet.</p>{% endfor %}
+        </div>
+        <form method="post" class="card panel" style="padding:1.5rem">
+          {% csrf_token %}
+          <h3>Add new address</h3>
+          <div class="field">{{ form.label.label_tag }}{{ form.label }}</div>
+          <div class="field">{{ form.recipient.label_tag }}{{ form.recipient }}</div>
+          <div class="field">{{ form.phone.label_tag }}{{ form.phone }}</div>
+          <div class="field">{{ form.line1.label_tag }}{{ form.line1 }}</div>
+          <div class="field">{{ form.line2.label_tag }}{{ form.line2 }}</div>
+          <div class="form-grid">
+            <div class="field">{{ form.city.label_tag }}{{ form.city }}</div>
+            <div class="field">{{ form.state.label_tag }}{{ form.state }}</div>
+          </div>
+          <div class="form-grid">
+            <div class="field">{{ form.postal_code.label_tag }}{{ form.postal_code }}</div>
+            <div class="field">{{ form.country.label_tag }}{{ form.country }}</div>
+          </div>
+          <label class="flex center gap-sm mb-2"><input type="checkbox" name="is_default" class="form-check" /> Set as default</label>
+          <button class="btn btn-block">Save address</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

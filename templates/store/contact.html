@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Contact — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="block" style="padding-top:2.5rem">
+  <div class="container">
+    <div class="grid grid-2" style="align-items:start;gap:3rem">
+      <div class="reveal">
+        <span class="eyebrow">Get in touch</span>
+        <h1>Say hello ☕</h1>
+        <p>Questions about an order, a wholesale enquiry, or just want to talk coffee? We'd love to hear from you.</p>
+        <div class="card panel mt-3">
+          <p class="small">📧 hello@coffeebliss.test</p>
+          <p class="small">📞 +1 (555) 010-2016</p>
+          <p class="small">📍 12 Roastery Lane, Bean Town</p>
+        </div>
+      </div>
+      <form method="post" class="card panel reveal">
+        {% csrf_token %}
+        <div class="form-grid">
+          <div class="field">{{ form.name.label_tag }}{{ form.name }}</div>
+          <div class="field">{{ form.email.label_tag }}{{ form.email }}</div>
+        </div>
+        <div class="field">{{ form.subject.label_tag }}{{ form.subject }}</div>
+        <div class="field">{{ form.message.label_tag }}{{ form.message }}</div>
+        <button class="btn btn-block">Send message</button>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

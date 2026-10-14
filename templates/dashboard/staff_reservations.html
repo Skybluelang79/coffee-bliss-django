@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Reservations — Staff — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    {% include "dashboard/_staff_nav.html" with nav="reservations" %}
+    <div>
+      <h1 style="font-size:1.9rem">Reservations</h1>
+      <div class="chip-row mt-2">
+        <a href="{% url 'dashboard:staff_reservations' %}" class="chip {% if not selected %}active{% endif %}">All</a>
+        {% for value, label in statuses %}<a href="?status={{ value }}" class="chip {% if selected == value %}active{% endif %}">{{ label }}</a>{% endfor %}
+      </div>
+      {% if reservations %}
+      <div class="table-wrap mt-3">
+        <table class="data">
+          <thead><tr><th>Guest</th><th>Contact</th><th>Date &amp; time</th><th>Party</th><th>Location</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for r in reservations %}
+              <tr>
+                <td><strong>{{ r.name }}</strong>{% if r.note %}<br><span class="muted small">{{ r.note|truncatechars:40 }}</span>{% endif %}</td>
+                <td class="small">{{ r.email }}<br>{{ r.phone }}</td>
+                <td>{{ r.date }}<br><span class="muted small">{{ r.time|time:"g:i A" }}</span></td>
+                <td>{{ r.party_size }}</td>
+                <td class="small">{{ r.location|default:"—" }}</td>
+                <td><span class="status {% if r.status == 'confirmed' %}green{% elif r.status == 'cancelled' %}red{% elif r.status == 'seated' %}blue{% else %}amber{% endif %}">{{ r.get_status_display }}</span></td>
+                <td>
+                  <form method="post" action="{% url 'dashboard:staff_update_reservation' r.pk %}" class="flex gap-sm">
+                    {% csrf_token %}
+                    <select name="status" class="form-select" style="min-width:130px">
+                      {% for value, label in statuses %}<option value="{{ value }}" {% if r.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                    <button class="btn btn-sm">Save</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="empty card mt-3"><div class="big">🗓️</div><p>No reservations match this filter.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

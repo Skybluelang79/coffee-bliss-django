@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Menu — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<section class="block" style="padding-top:2.5rem">
+  <div class="container">
+    <span class="eyebrow">Our menu</span>
+    <h1 style="font-size:clamp(2rem,4vw,3rem)">Crafted to <span class="gradient-text">delight</span></h1>
+    <p class="lead">From bold espressos to single-origin beans and fresh pastries — filter your way to the perfect pick.</p>
+
+    <form method="get" class="card mt-3" style="padding:1.2rem">
+      <div class="flex gap center wrap between">
+        <div class="chip-row">
+          <a href="{% url 'store:menu' %}" class="chip {% if not selected_category and not selected_kind and not selected_roast %}active{% endif %}">All</a>
+          {% for category in categories %}
+            <a href="?category={{ category.slug }}{% if selected_kind %}&kind={{ selected_kind }}{% endif %}{% if selected_roast %}&roast={{ selected_roast }}{% endif %}" class="chip {% if selected_category == category.slug %}active{% endif %}">{{ category.icon }} {{ category.name }}</a>
+          {% endfor %}
+        </div>
+        <div class="flex gap-sm center">
+          <select name="kind" class="form-select" data-autosubmit style="min-width:140px">
+            <option value="">All types</option>
+            {% for value, label in kinds %}<option value="{{ value }}" {% if selected_kind == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+          <select name="roast" class="form-select" data-autosubmit style="min-width:140px">
+            <option value="">All roasts</option>
+            {% for value, label in roasts %}{% if value != "na" %}<option value="{{ value }}" {% if selected_roast == value %}selected{% endif %}>{{ label }}</option>{% endif %}{% endfor %}
+          </select>
+          <select name="sort" class="form-select" data-autosubmit style="min-width:150px">
+            <option value="featured" {% if sort == "featured" %}selected{% endif %}>Featured</option>
+            <option value="price_asc" {% if sort == "price_asc" %}selected{% endif %}>Price: low to high</option>
+            <option value="price_desc" {% if sort == "price_desc" %}selected{% endif %}>Price: high to low</option>
+            <option value="newest" {% if sort == "newest" %}selected{% endif %}>Newest</option>
+            <option value="name" {% if sort == "name" %}selected{% endif %}>Name A–Z</option>
+          </select>
+        </div>
+      </div>
+      {% if selected_category or selected_kind or selected_roast or query %}<input type="hidden" name="category" value="{{ selected_category }}" />{% endif %}
+      <div class="flex gap-sm mt-2">
+        <input type="search" name="q" value="{{ query }}" class="form-input" placeholder="Search coffee, pastries, beans…" />
+        <button class="btn">Search</button>
+      </div>
+    </form>
+
+    <p class="muted small mt-3">{{ total }} item{{ total|pluralize }} found</p>
+    <div class="grid grid-4 mt-2">
+      {% for product in products %}
+        {% include "store/_product_card.html" with product=product %}
+      {% empty %}
+        <div class="empty" style="grid-column:1/-1">
+          <div class="big">🔍</div>
+          <h3>No matches</h3>
+          <p>Try a different search or clear the filters.</p>
+          <a href="{% url 'store:menu' %}" class="btn btn-ghost mt-2">Clear filters</a>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="flex gap-sm center mt-4" style="justify-content:center">
+      {% if page_obj.has_previous %}<a class="btn btn-ghost btn-sm" href="?page={{ page_obj.previous_page_number }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if query %}&q={{ query }}{% endif %}">← Prev</a>{% endif %}
+      <span class="pill-note">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}<a class="btn btn-ghost btn-sm" href="?page={{ page_obj.next_page_number }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if query %}&q={{ query }}{% endif %}">Next →</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

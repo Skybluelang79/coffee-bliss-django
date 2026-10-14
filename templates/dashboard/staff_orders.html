@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Orders — Staff — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    {% include "dashboard/_staff_nav.html" with nav="orders" %}
+    <div>
+      <h1 style="font-size:1.9rem">Order management</h1>
+      <div class="chip-row mt-2">
+        <a href="{% url 'dashboard:staff_orders' %}" class="chip {% if not selected %}active{% endif %}">All</a>
+        {% for value, label in statuses %}<a href="?status={{ value }}" class="chip {% if selected == value %}active{% endif %}">{{ label }}</a>{% endfor %}
+      </div>
+      {% if orders %}
+      <div class="table-wrap mt-3">
+        <table class="data">
+          <thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for order in orders %}
+              <tr>
+                <td><strong>{{ order.number }}</strong><br><span class="muted small">{{ order.created_at|date:"M d, H:i" }}</span></td>
+                <td>{{ order.customer_name }}<br><span class="muted small">{{ order.customer_phone }}</span></td>
+                <td>{{ order.item_count }}</td>
+                <td>{{ currency_symbol }}{{ order.total|floatformat:2 }}</td>
+                <td><span class="status {% if order.payment_status == 'paid' %}green{% else %}amber{% endif %}">{{ order.get_payment_status_display }}</span></td>
+                <td><span class="status {{ order.status_color }}">{{ order.get_status_display }}</span></td>
+                <td>
+                  <form method="post" action="{% url 'dashboard:staff_update_status' order.number %}" class="flex gap-sm">
+                    {% csrf_token %}
+                    <select name="status" class="form-select" style="min-width:140px">
+                      {% for value, label in statuses %}<option value="{{ value }}" {% if order.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                    <button class="btn btn-sm">Update</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="empty card mt-3"><div class="big">🧾</div><p>No orders match this filter.</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

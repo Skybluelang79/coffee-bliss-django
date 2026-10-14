@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Secure payment — {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+{% if not simulated %}<script src="https://js.stripe.com/v3/"></script>{% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="block" style="padding-top:3rem">
+  <div class="container" style="max-width:640px">
+    <span class="eyebrow">Secure checkout</span>
+    <h1 style="font-size:1.9rem">Payment</h1>
+    <p class="muted">Order <strong class="gradient-text">{{ order.number }}</strong> · total {{ currency }}{{ order.total|floatformat:2 }}</p>
+
+    <div class="card panel mt-3">
+      {% if simulated %}
+        <h3>Demo payment gateway</h3>
+        <p class="small">Stripe keys are not configured, so this is a simulated card payment. No real money moves.</p>
+        <form method="post" action="{% url 'orders:payment_simulate' order.number %}">
+          {% csrf_token %}
+          <button class="btn btn-block mt-2">Pay {{ currency }}{{ order.total|floatformat:2 }} now</button>
+        </form>
+      {% else %}
+        <div id="payment-element"></div>
+        <button id="submit" class="btn btn-block mt-3">Pay {{ currency }}{{ order.total|floatformat:2 }}</button>
+        <div id="payment-message" class="small mt-2"></div>
+        <p class="form-hint mt-1">Test card: 4242 4242 4242 4242 · any future date · any CVC.</p>
+      {% endif %}
+      <a href="{% url 'orders:cart' %}" class="btn btn-ghost btn-block mt-2">Cancel and return to cart</a>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+{% if not simulated %}
+<script>
+  const stripe = Stripe("{{ stripe_publishable_key }}");
+  const clientSecret = "{{ client_secret }}";
+  const elements = stripe.elements({ clientSecret, appearance: { theme: 'night', variables: { colorPrimary: '#c8963e' } } });
+  const paymentElement = elements.create("payment");
+  paymentElement.mount("#payment-element");
+
+  const form = document.getElementById("submit");
+  const messageEl = document.getElementById("payment-message");
+  form.addEventListener("click", async () => {
+    form.disabled = true;
+    messageEl.textContent = "Processing…";
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: { return_url: window.location.origin + "{% url 'orders:order_confirmation' order.number %}" },
+    });
+    if (error) {
+      messageEl.style.color = "var(--danger)";
+      messageEl.textContent = error.message;
+      form.disabled = false;
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,45 @@
+{% load static humanize %}
+<article class="product-card reveal" data-tilt>
+  <a href="{{ product.get_absolute_url }}" class="product-media">
+    {% if product.image %}
+      <img src="{{ product.image.url }}" alt="{{ product.name }}" loading="lazy" />
+    {% else %}
+      <div class="emoji-fallback">{{ product.category.icon|default:"☕" }}</div>
+    {% endif %}
+    <div class="badges">
+      {% if product.discount_percent %}<span class="badge discount">-{{ product.discount_percent }}%</span>{% endif %}
+      {% if product.is_new %}<span class="badge new">New</span>{% endif %}
+      {% if product.stock < 10 and product.stock > 0 %}<span class="badge low">Low stock</span>{% endif %}
+      {% if product.stock == 0 %}<span class="badge low">Sold out</span>{% endif %}
+    </div>
+  </a>
+  {% if user.is_authenticated %}
+  <form method="post" action="{% url 'store:toggle_favorite' product.slug %}">
+    {% csrf_token %}
+    <button class="fav-btn {% if product.pk in favorite_ids %}active{% endif %}" title="Save to favorites">♥</button>
+  </form>
+  {% endif %}
+  <div class="product-body">
+    <span class="cat">{{ product.category.name }}</span>
+    <h3><a href="{{ product.get_absolute_url }}">{{ product.name }}</a></h3>
+    <p class="desc">{{ product.short_description|default:product.description|truncatechars:70 }}</p>
+    <div class="flex between center">
+      {% if product.rating_display %}
+        <span class="rating">★ {{ product.rating_display }} <span class="muted">({{ product.review_count }})</span></span>
+      {% else %}
+        <span class="rating muted small">New arrival</span>
+      {% endif %}
+      {% if product.roast != "na" %}<span class="pill-note small">{{ product.get_roast_display }}</span>{% endif %}
+    </div>
+    <div class="product-foot">
+      <span class="price">{{ currency_symbol }}{{ product.price|floatformat:2 }}{% if product.compare_at_price %}<s>{{ currency_symbol }}{{ product.compare_at_price|floatformat:2 }}</s>{% endif %}</span>
+      <form method="post" action="{% url 'orders:cart_add' product.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+        <button class="btn btn-sm" {% if not product.in_stock %}disabled{% endif %}>
+          {% if product.in_stock %}Add +{% else %}Sold out{% endif %}
+        </button>
+      </form>
+    </div>
+  </div>
+</article>

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Stock ledger — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    {% include "dashboard/_staff_nav.html" with nav="movements" %}
+    <div>
+      <span class="eyebrow">Audit trail</span>
+      <h1 style="font-size:1.9rem">Stock ledger</h1>
+      <div class="chip-row mt-2">
+        <a href="{% url 'inventory:movements' %}" class="chip {% if not selected %}active{% endif %}">All</a>
+        {% for value, label in kinds %}
+          <a href="?kind={{ value }}" class="chip {% if selected == value %}active{% endif %}">{{ label }}</a>
+        {% endfor %}
+      </div>
+      <div class="card panel mt-3">
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>When</th><th>Item</th><th>Kind</th><th>Qty</th><th>Reason</th><th>Order</th><th>By</th></tr></thead>
+            <tbody>
+              {% for m in movements %}
+                <tr>
+                  <td class="muted small">{{ m.created_at|date:"M j, H:i" }}</td>
+                  <td class="small">{% if m.ingredient %}<a href="{% url 'inventory:detail' m.ingredient.pk %}">{{ m.ingredient.name }}</a>{% else %}{{ m.product.name|default:"—" }}{% endif %}</td>
+                  <td><span class="status gray">{{ m.get_kind_display }}</span></td>
+                  <td class="{% if m.quantity < 0 %}muted{% endif %}">{{ m.quantity|floatformat:2 }} {{ m.unit }}</td>
+                  <td class="small">{{ m.reason|default:"—" }}</td>
+                  <td class="muted small">{{ m.order.number|default:"—" }}</td>
+                  <td class="muted small">{{ m.created_by.get_short_name|default:"system" }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="7" class="muted small">No movements recorded yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

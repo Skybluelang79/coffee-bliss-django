@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Track {{ order.number }} — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="block" style="padding-top:2.5rem">
+  <div class="container" style="max-width:760px">
+    <div class="flex between center">
+      <div>
+        <span class="eyebrow">Order tracking</span>
+        <h1 style="font-size:1.8rem">{{ order.number }}</h1>
+      </div>
+      <span class="status {{ order.status_color }}">{{ order.get_status_display }}</span>
+    </div>
+
+    <div class="card panel mt-3">
+      <h3>Progress</h3>
+      <div class="timeline mt-2">
+        <div class="step {% if order.status != 'pending' %}done{% endif %} {% if order.status == 'pending' %}current{% endif %}">
+          <strong>Order received</strong><p class="small muted">{{ order.placed_at|date:"g:i A" }}</p>
+        </div>
+        <div class="step {% if order.status == 'preparing' or order.status == 'ready' or order.status == 'out_for_delivery' or order.status == 'completed' %}done{% endif %} {% if order.status == 'confirmed' %}current{% endif %}">
+          <strong>Confirmed</strong><p class="small muted">We've accepted your order</p>
+        </div>
+        <div class="step {% if order.status == 'ready' or order.status == 'out_for_delivery' or order.status == 'completed' %}done{% endif %} {% if order.status == 'preparing' %}current{% endif %}">
+          <strong>Preparing</strong><p class="small muted">Our baristas are on it ☕</p>
+        </div>
+        <div class="step {% if order.status == 'out_for_delivery' or order.status == 'completed' %}done{% endif %} {% if order.status == 'ready' %}current{% endif %}">
+          <strong>Ready</strong><p class="small muted">{% if order.fulfillment == 'delivery' %}Out for delivery{% else %}Ready for pickup{% endif %}</p>
+        </div>
+        <div class="step {% if order.status == 'completed' %}done{% endif %} {% if order.status == 'out_for_delivery' %}current{% endif %}">
+          <strong>Completed</strong><p class="small muted">Enjoy! 🎉</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card panel mt-2">
+      <h3>Items</h3>
+      {% for item in order.items.all %}
+        <div class="flex between center" style="padding:.5rem 0;border-bottom:1px solid var(--line)">
+          <span>{{ item.quantity }} × {{ item.name }}</span><span>{{ currency_symbol }}{{ item.line_total|floatformat:2 }}</span>
+        </div>
+      {% endfor %}
+      <div class="summary-row total mt-2"><span>Total</span><span>{{ currency_symbol }}{{ order.total|floatformat:2 }}</span></div>
+    </div>
+
+    {% if order.history.all %}
+    <div class="card panel mt-2">
+      <h3>Activity</h3>
+      <div class="timeline mt-2">
+        {% for event in order.history.all %}
+          <div class="step done"><strong>{{ event.get_status_display }}</strong><p class="small muted">{{ event.created_at|naturaltime }}{% if event.note %} · {{ event.note }}{% endif %}</p></div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

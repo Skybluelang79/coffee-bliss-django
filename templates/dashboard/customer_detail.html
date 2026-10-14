@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}{{ customer.get_full_name }} — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    <aside class="dash-nav">
+      <a href="{% url 'dashboard:admin_home' %}">📊 Analytics</a>
+      <a href="{% url 'dashboard:customers' %}" class="active">👥 Customers</a>
+      <a href="{% url 'dashboard:reports' %}">📈 Reports</a>
+    </aside>
+    <div>
+      <a href="{% url 'dashboard:customers' %}" class="btn btn-ghost btn-sm">← All customers</a>
+      <div class="flex center gap mt-2">
+        {% if customer.avatar %}<img src="{{ customer.avatar.url }}" style="width:80px;height:80px;border-radius:50%;object-fit:cover" />
+        {% else %}<div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--brand-2),var(--brand-3));display:grid;place-items:center;font-size:2rem">☕</div>{% endif %}
+        <div>
+          <h1 style="font-size:1.7rem;margin:0">{{ customer.get_full_name|default:customer.get_short_name }}</h1>
+          <p class="muted small">{{ customer.email }} · {{ customer.phone|default:"no phone" }}</p>
+          <span class="status blue">{{ customer.get_role_display }}</span>
+          <span class="pill-note small">{{ customer.loyalty_points }} beans</span>
+        </div>
+      </div>
+
+      <div class="metric-grid mt-3">
+        <div class="card metric"><div class="label">Orders</div><div class="value">{{ orders|length }}</div></div>
+        <div class="card metric"><div class="label">Lifetime value</div><div class="value">{{ currency_symbol }}{{ orders.first.total|default:0|floatformat:2 }}</div></div>
+        <div class="card metric"><div class="label">Joined</div><div class="value" style="font-size:1.2rem">{{ customer.date_joined|date:"M Y" }}</div></div>
+      </div>
+
+      <div class="card panel mt-3">
+        <h3>Order history</h3>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Order</th><th>Date</th><th>Items</th><th>Total</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for order in orders %}
+                <tr>
+                  <td>{{ order.number }}</td>
+                  <td class="muted small">{{ order.created_at|date:"M d, Y" }}</td>
+                  <td>{{ order.item_count }}</td>
+                  <td>{{ currency_symbol }}{{ order.total|floatformat:2 }}</td>
+                  <td><span class="status {{ order.status_color }}">{{ order.get_status_display }}</span></td>
+                </tr>
+              {% empty %}<tr><td colspan="5" class="muted">No orders.</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ post.title }} — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<article class="block" style="padding-top:2.5rem">
+  <div class="container" style="max-width:760px">
+    <span class="eyebrow">{{ post.published_at|date:"F d, Y" }} · {{ post.read_minutes }} min read</span>
+    <h1>{{ post.title }}</h1>
+    {% if post.author %}<p class="muted small">By {{ post.author.get_full_name|default:post.author.email }}</p>{% endif %}
+    {% if post.cover_image %}<img src="{{ post.cover_image.url }}" alt="{{ post.title }}" style="border-radius:var(--radius);margin:1.5rem 0" />{% endif %}
+    <div class="mt-2" style="font-size:1.05rem;line-height:1.8">{{ post.body|linebreaks }}</div>
+    <a href="{% url 'store:blog' %}" class="btn btn-ghost btn-sm mt-4">← Back to journal</a>
+  </div>
+</article>
+{% if related %}
+<section class="block">
+  <div class="container">
+    <div class="section-head"><div><span class="eyebrow">Keep reading</span><h2>More from the journal</h2></div></div>
+    <div class="grid grid-3">
+      {% for post in related %}
+        <a href="{{ post.get_absolute_url }}" class="card reveal" style="padding:1.4rem">
+          <span class="eyebrow">{{ post.published_at|date:"M d" }}</span>
+          <h3 class="mt-1">{{ post.title }}</h3>
+          <p class="small">{{ post.excerpt|truncatechars:90 }}</p>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
