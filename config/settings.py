@@ -25,6 +25,13 @@ DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 SITE_NAME = env("SITE_NAME")
 
+# Render injects these at runtime. Use them to trust the public host and to
+# build absolute links (e.g. in recovery emails) without hard-coding a domain.
+RENDER_EXTERNAL_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME", default="")
+RENDER_EXTERNAL_URL = env("RENDER_EXTERNAL_URL", default="")
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
 INSTALLED_APPS = [
     "daphne",
     "django.contrib.admin",
@@ -184,7 +191,12 @@ EMAIL_BACKEND = env(
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="hello@coffeebliss.test")
 
 # Absolute base URL used when building links in outbound emails.
-SITE_URL = env("SITE_URL", default="http://127.0.0.1:8000")
+SITE_URL = env("SITE_URL", default=RENDER_EXTERNAL_URL or "http://127.0.0.1:8000")
+
+# Origins allowed to send unsafe (POST) requests, e.g. the Render HTTPS URL.
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+if RENDER_EXTERNAL_URL and RENDER_EXTERNAL_URL not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(RENDER_EXTERNAL_URL)
 
 # Abandoned-cart recovery
 CART_RECOVERY_HOURS = env.int("CART_RECOVERY_HOURS", default=6)
