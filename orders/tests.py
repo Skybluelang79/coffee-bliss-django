@@ -172,6 +172,21 @@ class GiftCardTests(TestCase):
             GiftCardTransaction.objects.filter(kind=GiftCardTransaction.Kind.REFUND).exists()
         )
 
+    def test_partial_refund_credits_gift_card_proportionally(self):
+        from orders import payments
+
+        card = GiftCard.objects.create(initial_balance=Decimal("5.00"), balance=Decimal("5.00"))
+        self.client.login(email="gift@example.com", password="pw")
+        self._add_to_cart(quantity=2)  # total after gift card = 21.50 - 5.00 = 16.50
+        self.client.post(reverse("orders:apply_gift_card"), {"code": card.code})
+        self._checkout()
+        order = Order.objects.get()
+
+        ok, error = payments.refund_order(order, amount=Decimal("8.25"))  # half of 16.50
+        self.assertTrue(ok, error)
+        card.refresh_from_db()
+        self.assertEqual(card.balance, Decimal("2.50"))
+
 
 @FAST
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")

@@ -154,18 +154,22 @@ def refund_order(order: Order, amount: Decimal | None = None, user=None):
 
     restore_for_order(order, user=user)
 
-    # Return any gift card amount that was applied to the order.
-    if order.gift_card_id and order.gift_card_amount:
-        card = order.gift_card
-        credited = card.credit(order.gift_card_amount)
-        GiftCardTransaction.objects.create(
-            gift_card=card,
-            order=order,
-            kind=GiftCardTransaction.Kind.REFUND,
-            amount=credited,
-            balance_after=card.balance,
-            note=f"Refunded from order {order.number}",
-        )
+    # Return the portion of any applied gift card, proportional to the amount
+    # being refunded (a full refund returns the whole gift card contribution).
+    if order.gift_card_id and order.gift_card_amount and payment.amount > 0:
+        fraction = amount / payment.amount
+        credit = (order.gift_card_amount * fraction).quantize(Decimal("0.01"))
+        if credit > 0:
+            card = order.gift_card
+            credited = card.credit(credit)
+            GiftCardTransaction.objects.create(
+                gift_card=card,
+                order=order,
+                kind=GiftCardTransaction.Kind.REFUND,
+                amount=credited,
+                balance_after=card.balance,
+                note=f"Refunded from order {order.number}",
+            )
 
     OrderStatusHistory.objects.create(
         order=order, status=Order.Status.REFUNDED, changed_by=user, note=f"Refunded {amount}"
