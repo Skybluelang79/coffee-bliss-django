@@ -40,6 +40,7 @@
           <span>{{ item.quantity }} × {{ item.name }}</span><span>{{ currency_symbol }}{{ item.line_total|floatformat:2 }}</span>
         </div>
       {% endfor %}
+      {% if order.gift_card_amount %}<div class="summary-row"><span>Gift card</span><span style="color:var(--success)">-{{ currency_symbol }}{{ order.gift_card_amount|floatformat:2 }}</span></div>{% endif %}
       <div class="summary-row total mt-2"><span>Total</span><span>{{ currency_symbol }}{{ order.total|floatformat:2 }}</span></div>
     </div>
 

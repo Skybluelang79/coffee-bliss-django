@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.models import User
-from orders.models import Order, OrderStatusHistory, Reservation
+from orders.models import AbandonedCart, Order, OrderStatusHistory, Reservation
 from store.models import Coupon, NewsletterSubscriber, Product, Review
 
 
@@ -199,6 +199,7 @@ def admin_home(request):
     paid = Order.objects.filter(payment_status=Order.PaymentStatus.PAID)
     total_revenue = paid.aggregate(t=Coalesce(Sum("total"), Decimal("0")))["t"]
     max_revenue = max((row["revenue"] for row in chart), default=0) or 1
+    open_carts = AbandonedCart.objects.filter(status=AbandonedCart.Status.OPEN)
     top_products = (
         Product.objects.filter(order_items__order__payment_status=Order.PaymentStatus.PAID)
         .annotate(sold=Sum("order_items__quantity"), revenue=Sum(F("order_items__quantity") * F("order_items__unit_price")))
@@ -231,8 +232,31 @@ def admin_home(request):
         "reservations_upcoming": Reservation.objects.filter(
             date__gte=now.date(), status=Reservation.Status.CONFIRMED
         ).count(),
+        "abandoned_count": open_carts.count(),
+        "abandoned_value": open_carts.aggregate(
+            t=Coalesce(Sum("subtotal"), Decimal("0"))
+        )["t"],
+        "abandoned_carts": open_carts.order_by("-updated_at")[:5],
     }
     return render(request, "dashboard/admin_home.html", context)
+
+
+@manager_required
+@require_POST
+def send_cart_reminders(request):
+    from django.conf import settings
+
+    from orders.recovery import run_recovery
+
+    sent, considered = run_recovery(
+        hours=settings.CART_RECOVERY_HOURS,
+        max_reminders=settings.CART_RECOVERY_MAX_REMINDERS,
+    )
+    messages.success(
+        request,
+        f"Sent {sent} recovery email(s) out of {considered} eligible cart(s).",
+    )
+    return redirect("dashboard:admin_home")
 
 
 @manager_required

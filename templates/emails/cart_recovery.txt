@@ -1,0 +1,17 @@
+{{ first_name|default:"Hi there" }},
+
+Your cart at {{ site_name }} is still waiting for you. Good coffee shouldn't sit around.
+
+{% for item in items %}- {{ item.quantity }} × {{ item.name }} ({{ currency_symbol }}{{ item.unit_price }} each)
+{% endfor %}
+Subtotal: {{ currency_symbol }}{{ subtotal }}
+
+Finish your order: {{ cart_url }}
+
+Still browsing? Explore the menu: {{ menu_url }}
+
+See you soon,
+The {{ site_name }} team
+
+--
+You're receiving this because you started an order at {{ site_name }}. If you'd rather not hear from us, simply ignore this message.

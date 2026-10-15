@@ -10,6 +10,7 @@ from store.models import Product
 CART_SESSION_KEY = "coffee_cart"
 COUPON_SESSION_KEY = "coffee_coupon"
 POINTS_SESSION_KEY = "coffee_points"
+GIFT_CARD_SESSION_KEY = "coffee_gift_card"
 
 
 class Cart:
@@ -54,6 +55,7 @@ class Cart:
         self.session[CART_SESSION_KEY] = {}
         self.session.pop(COUPON_SESSION_KEY, None)
         self.session.pop(POINTS_SESSION_KEY, None)
+        self.session.pop(GIFT_CARD_SESSION_KEY, None)
         self.cart = self.session[CART_SESSION_KEY]
         self.save()
 
@@ -142,9 +144,37 @@ class Cart:
             Decimal("0.01")
         )
 
+    # ---- gift card helpers ----------------------------------------------
+    def set_gift_card(self, code):
+        if not code:
+            self.session.pop(GIFT_CARD_SESSION_KEY, None)
+        else:
+            self.session[GIFT_CARD_SESSION_KEY] = str(code).strip().upper()
+        self.save()
+
+    def get_gift_card(self):
+        from orders.models import GiftCard
+
+        code = self.session.get(GIFT_CARD_SESSION_KEY)
+        if not code:
+            return None
+        return GiftCard.objects.filter(code__iexact=code).first()
+
+    @property
+    def gift_card_discount(self):
+        card = self.get_gift_card()
+        if not card or not card.is_usable:
+            return Decimal("0.00")
+        due = self.subtotal - self.discount + self.delivery_fee + self.tax - self.loyalty_discount
+        due = max(Decimal("0.00"), due)
+        return min(card.balance, due).quantize(Decimal("0.01"))
+
     @property
     def grand_total(self):
-        value = self.subtotal - self.discount + self.delivery_fee + self.tax - self.loyalty_discount
+        value = (
+            self.subtotal - self.discount + self.delivery_fee + self.tax
+            - self.loyalty_discount - self.gift_card_discount
+        )
         return max(Decimal("0.00"), value.quantize(Decimal("0.01")))
 
     @property

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your cart is waiting</title>
+</head>
+<body style="margin:0;padding:0;background:#f5efe6;font-family:Arial,Helvetica,sans-serif;color:#2b2118;">
+  <div style="max-width:560px;margin:0 auto;padding:24px;">
+    <div style="background:#2b2118;border-radius:16px 16px 0 0;padding:24px;text-align:center;">
+      <span style="color:#e6c17a;font-size:26px;font-weight:bold;">☕ {{ site_name }}</span>
+    </div>
+    <div style="background:#ffffff;padding:28px;border-radius:0 0 16px 16px;">
+      <h1 style="margin:0 0 8px;font-size:22px;">You left something delicious behind</h1>
+      <p style="margin:0 0 20px;color:#6b5c4d;">{{ first_name|default:"Hi there" }}, your cart is still saved and ready when you are.</p>
+
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+        {% for item in items %}
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #ece3d6;">{{ item.quantity }} × {{ item.name }}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #ece3d6;text-align:right;color:#6b5c4d;">{{ currency_symbol }}{{ item.unit_price }}</td>
+        </tr>
+        {% endfor %}
+        <tr>
+          <td style="padding:12px 0;font-weight:bold;">Subtotal</td>
+          <td style="padding:12px 0;text-align:right;font-weight:bold;">{{ currency_symbol }}{{ subtotal }}</td>
+        </tr>
+      </table>
+
+      <div style="text-align:center;margin:24px 0;">
+        <a href="{{ cart_url }}" style="background:#c8963e;color:#ffffff;text-decoration:none;padding:13px 28px;border-radius:999px;font-weight:bold;display:inline-block;">Return to my cart</a>
+      </div>
+      <p style="margin:0;text-align:center;color:#6b5c4d;font-size:14px;">
+        Still browsing? <a href="{{ menu_url }}" style="color:#c8963e;">Explore the menu</a>.
+      </p>
+    </div>
+    <p style="text-align:center;color:#9b8b7a;font-size:12px;margin-top:16px;">
+      You're receiving this because you started an order at {{ site_name }}.
+    </p>
+  </div>
+</body>
+</html>

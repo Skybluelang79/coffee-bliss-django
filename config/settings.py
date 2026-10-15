@@ -55,6 +55,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "orders.middleware.CartRecoveryMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -181,6 +182,13 @@ EMAIL_BACKEND = env(
     "EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend"
 )
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="hello@coffeebliss.test")
+
+# Absolute base URL used when building links in outbound emails.
+SITE_URL = env("SITE_URL", default="http://127.0.0.1:8000")
+
+# Abandoned-cart recovery
+CART_RECOVERY_HOURS = env.int("CART_RECOVERY_HOURS", default=6)
+CART_RECOVERY_MAX_REMINDERS = env.int("CART_RECOVERY_MAX_REMINDERS", default=2)
 
 MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
 

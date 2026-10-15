@@ -42,6 +42,7 @@
         <div class="summary-row"><span>Delivery</span><span>{% if cart.delivery_fee %}{{ currency_symbol }}{{ cart.delivery_fee|floatformat:2 }}{% else %}Free{% endif %}</span></div>
         <div class="summary-row"><span>Tax</span><span>{{ currency_symbol }}{{ cart.tax|floatformat:2 }}</span></div>
         {% if cart.loyalty_discount %}<div class="summary-row"><span>Loyalty ({{ cart.points_used }})</span><span style="color:var(--success)">-{{ currency_symbol }}{{ cart.loyalty_discount|floatformat:2 }}</span></div>{% endif %}
+        {% if cart.gift_card_discount %}<div class="summary-row"><span>Gift card{% if cart.get_gift_card %} ({{ cart.get_gift_card.code }}){% endif %}</span><span style="color:var(--success)">-{{ currency_symbol }}{{ cart.gift_card_discount|floatformat:2 }}</span></div>{% endif %}
         <div class="summary-row total"><span>Total</span><span>{{ currency_symbol }}{{ cart.grand_total|floatformat:2 }}</span></div>
 
         {% if cart.to_free_delivery %}
@@ -54,6 +55,26 @@
           <input type="text" name="code" class="form-input" placeholder="Promo code" value="{{ cart.get_coupon.code|default:'' }}" />
           <button class="btn btn-ghost">Apply</button>
         </form>
+
+        {% if cart.get_gift_card and cart.get_gift_card.is_usable %}
+          <form method="post" action="{% url 'orders:remove_gift_card' %}" class="mt-1">
+            {% csrf_token %}
+            <button class="btn btn-ghost btn-block">Remove gift card {{ cart.get_gift_card.code }}</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'orders:apply_gift_card' %}" class="flex gap-sm mt-1">
+            {% csrf_token %}
+            <input type="text" name="code" class="form-input" placeholder="Gift card code" />
+            <button class="btn btn-ghost">Redeem</button>
+          </form>
+        {% endif %}
+
+        <form method="post" action="{% url 'orders:capture_cart_email' %}" class="flex gap-sm mt-2">
+          {% csrf_token %}
+          <input type="email" name="email" class="form-input" placeholder="Email me my cart" value="{{ user.email|default:'' }}" />
+          <button class="btn btn-ghost">Save</button>
+        </form>
+        <p class="small muted">We'll send a gentle reminder if you don't finish checking out.</p>
 
         <a href="{% url 'orders:checkout' %}" class="btn btn-block mt-3">Proceed to checkout →</a>
         <a href="{% url 'store:menu' %}" class="btn btn-ghost btn-block mt-1">Continue shopping</a>

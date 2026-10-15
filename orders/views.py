@@ -7,8 +7,15 @@ from django.views.decorators.http import require_POST
 
 from . import payments
 from .cart import Cart
-from .forms import CheckoutForm, ReservationForm
-from .models import Order, OrderItem, OrderStatusHistory, Reservation
+from .forms import CartEmailForm, CheckoutForm, ReservationForm
+from .models import (
+    GiftCard,
+    GiftCardTransaction,
+    Order,
+    OrderItem,
+    OrderStatusHistory,
+    Reservation,
+)
 
 
 def cart_detail(request):
@@ -82,6 +89,46 @@ def apply_coupon(request):
     return redirect("orders:cart")
 
 
+@require_POST
+def apply_gift_card(request):
+    cart = Cart(request)
+    card, error = GiftCard.lookup(request.POST.get("code", ""))
+    if card:
+        cart.set_gift_card(card.code)
+        messages.success(request, f"Gift card {card.code} applied!")
+    else:
+        cart.set_gift_card(None)
+        messages.error(request, error)
+    return redirect(request.POST.get("next") or reverse("orders:cart"))
+
+
+@require_POST
+def remove_gift_card(request):
+    cart = Cart(request)
+    cart.set_gift_card(None)
+    messages.info(request, "Gift card removed.")
+    return redirect("orders:cart")
+
+
+@require_POST
+def capture_cart_email(request):
+    from .recovery import capture_email
+
+    cart = Cart(request)
+    if not len(cart):
+        messages.info(request, "Add something to your cart first.")
+        return redirect("orders:cart")
+    form = CartEmailForm(request.POST)
+    if form.is_valid():
+        capture_email(request, form.cleaned_data["email"])
+        messages.success(
+            request, "Saved! We'll email you if you leave something behind."
+        )
+    else:
+        messages.error(request, "Please enter a valid email address.")
+    return redirect("orders:cart")
+
+
 def checkout(request):
     cart = Cart(request)
     if not len(cart):
@@ -104,6 +151,16 @@ def checkout(request):
             order = _create_order(request, cart, form)
             method = form.cleaned_data.get("payment_method") or "card"
             cart.clear()
+
+            if order.total <= 0:
+                payments.simulate_success(
+                    order, user=request.user if request.user.is_authenticated else None
+                )
+                messages.success(
+                    request,
+                    f"Order {order.number} placed — fully covered by your gift card! ☕",
+                )
+                return redirect("orders:order_confirmation", number=order.number)
 
             if method == "cash":
                 payments.simulate_success(order, user=request.user if request.user.is_authenticated else None)
@@ -143,6 +200,10 @@ def _create_order(request, cart, form):
 
         order.coupon = Coupon.objects.filter(code__iexact=data["coupon_code"]).first()
 
+    gift_card = cart.get_gift_card()
+    if gift_card and gift_card.is_usable:
+        order.gift_card = gift_card
+
     order.save()
     for line in cart:
         OrderItem.objects.create(
@@ -155,6 +216,21 @@ def _create_order(request, cart, form):
         )
     order = order.recalculate()
     order.save()
+
+    # Redeem the gift card now that the order total is known.
+    if order.gift_card_id and order.gift_card_amount:
+        applied = order.gift_card.redeem(order.gift_card_amount)
+        if applied != order.gift_card_amount:
+            order.gift_card_amount = applied
+            order.save(update_fields=["gift_card_amount"])
+        GiftCardTransaction.objects.create(
+            gift_card=order.gift_card,
+            order=order,
+            kind=GiftCardTransaction.Kind.REDEMPTION,
+            amount=-applied,
+            balance_after=order.gift_card.balance,
+            note=f"Applied to order {order.number}",
+        )
 
     # Redeem loyalty points
     if order.points_used and request.user.is_authenticated:
@@ -180,6 +256,10 @@ def _create_order(request, cart, form):
     if order.coupon:
         order.coupon.used_count += 1
         order.coupon.save(update_fields=["used_count"])
+
+    from .recovery import mark_cart_recovered
+
+    mark_cart_recovered(request, order)
     return order
 
 

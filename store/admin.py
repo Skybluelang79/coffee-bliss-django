@@ -2,7 +2,10 @@ from django.contrib import admin
 from django.utils.html import format_html
 
 from .models import (
+    BaristaNote,
     BlogPost,
+    BrewGuide,
+    BrewStep,
     Category,
     Coupon,
     Favorite,
@@ -18,6 +21,11 @@ from .models import (
 
 class ProductImageInline(admin.TabularInline):
     model = ProductImage
+    extra = 1
+
+
+class BaristaNoteInline(admin.TabularInline):
+    model = BaristaNote
     extra = 1
 
 
@@ -52,7 +60,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_filter = ("kind", "roast", "category", "is_featured", "is_active")
     search_fields = ("name", "description", "origin")
     prepopulated_fields = {"slug": ("name",)}
-    inlines = [ProductImageInline]
+    inlines = [ProductImageInline, BaristaNoteInline]
     filter_horizontal = ("tags",)
     readonly_fields = ("created_at", "updated_at")
     fieldsets = (
@@ -132,6 +140,62 @@ class NewsletterSubscriberAdmin(admin.ModelAdmin):
     list_display = ("email", "source", "is_active", "created_at")
     list_filter = ("is_active",)
     search_fields = ("email",)
+
+
+class BrewStepInline(admin.TabularInline):
+    model = BrewStep
+    extra = 1
+    fields = ("order", "title", "instruction", "duration_seconds", "tip")
+
+
+@admin.register(BrewGuide)
+class BrewGuideAdmin(admin.ModelAdmin):
+    list_display = (
+        "title",
+        "product",
+        "method",
+        "difficulty",
+        "total_time_minutes",
+        "step_count",
+        "is_published",
+    )
+    list_filter = ("method", "difficulty", "is_published")
+    search_fields = ("title", "product__name", "description")
+    list_editable = ("is_published",)
+    inlines = [BrewStepInline]
+    fieldsets = (
+        ("Guide", {"fields": ("product", "title", "method", "description")}),
+        (
+            "Recipe",
+            {
+                "fields": (
+                    "difficulty",
+                    "total_time_minutes",
+                    "ratio",
+                    "grind",
+                    "water_temp_c",
+                    "yield_text",
+                )
+            },
+        ),
+        ("Publishing", {"fields": ("is_published", "sort_order")}),
+    )
+
+    @admin.display(description="Steps")
+    def step_count(self, obj):
+        return obj.step_count
+
+
+@admin.register(BaristaNote)
+class BaristaNoteAdmin(admin.ModelAdmin):
+    list_display = ("product", "author", "short_body", "is_published", "sort_order")
+    list_filter = ("is_published",)
+    search_fields = ("product__name", "author", "body")
+    list_editable = ("is_published", "sort_order")
+
+    @admin.display(description="Note")
+    def short_body(self, obj):
+        return obj.body[:70] + ("…" if len(obj.body) > 70 else "")
 
 
 admin.site.register(Favorite)

@@ -1,4 +1,6 @@
 from decimal import Decimal
+import secrets
+import string
 
 from django.conf import settings
 from django.core.validators import MinValueValidator
@@ -59,6 +61,13 @@ class Order(models.Model):
         blank=True,
         related_name="orders",
     )
+    gift_card = models.ForeignKey(
+        "orders.GiftCard",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orders",
+    )
     customer_name = models.CharField(max_length=160)
     customer_phone = models.CharField(max_length=40, blank=True)
     delivery_address = models.CharField(max_length=300, blank=True)
@@ -69,6 +78,7 @@ class Order(models.Model):
     delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     tax = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     loyalty_discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    gift_card_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     points_used = models.PositiveIntegerField(default=0)
     points_earned = models.PositiveIntegerField(default=0)
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -127,12 +137,19 @@ class Order(models.Model):
 
         taxable = max(Decimal("0.00"), self.subtotal - self.discount)
         self.tax = (taxable * Decimal(str(tax_rate))).quantize(Decimal("0.01"))
-        self.total = (
+        base = (
             self.subtotal - self.discount + self.delivery_fee + self.tax
             - self.loyalty_discount
+        )
+        if self.gift_card_id and self.gift_card and self.gift_card.is_usable:
+            self.gift_card_amount = min(
+                self.gift_card.balance, max(Decimal("0.00"), base)
+            ).quantize(Decimal("0.01"))
+        else:
+            self.gift_card_amount = Decimal("0.00")
+        self.total = max(
+            Decimal("0.00"), base - self.gift_card_amount
         ).quantize(Decimal("0.01"))
-        if self.total < 0:
-            self.total = Decimal("0.00")
         return self
 
     @property
@@ -321,3 +338,214 @@ class Subscription(models.Model):
         base = self.next_delivery or timezone.now().date()
         self.next_delivery = base + timedelta(days=days)
         self.save(update_fields=["next_delivery"])
+
+
+class GiftCard(models.Model):
+    """A prepaid balance that can be redeemed against an order at checkout."""
+
+    class State(models.TextChoices):
+        ACTIVE = "active", "Active"
+        REDEEMED = "redeemed", "Redeemed"
+        EXPIRED = "expired", "Expired"
+        DISABLED = "disabled", "Disabled"
+
+    code = models.CharField(max_length=32, unique=True, editable=False)
+    initial_balance = models.DecimalField(max_digits=10, decimal_places=2)
+    balance = models.DecimalField(max_digits=10, decimal_places=2)
+    purchaser = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="purchased_gift_cards",
+    )
+    recipient_email = models.EmailField(blank=True)
+    recipient_name = models.CharField(max_length=120, blank=True)
+    message = models.CharField(max_length=255, blank=True)
+    note = models.CharField(max_length=255, blank=True, help_text="Internal admin note.")
+    is_active = models.BooleanField(default=True)
+    expires_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["code"]), models.Index(fields=["is_active"])]
+
+    def __str__(self):
+        return f"{self.code} ({self.balance})"
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = self._generate_code()
+        if self.balance is None:
+            self.balance = self.initial_balance
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def _generate_code():
+        alphabet = string.ascii_uppercase + string.digits
+        while True:
+            groups = ["".join(secrets.choice(alphabet) for _ in range(4)) for _ in range(3)]
+            code = "CB-" + "-".join(groups)
+            if not GiftCard.objects.filter(code=code).exists():
+                return code
+
+    @property
+    def is_expired(self):
+        return bool(self.expires_at and self.expires_at <= timezone.now())
+
+    @property
+    def is_redeemed(self):
+        return self.balance <= 0
+
+    @property
+    def is_usable(self):
+        return self.is_active and not self.is_expired and self.balance > 0
+
+    @property
+    def state(self):
+        if not self.is_active:
+            return self.State.DISABLED
+        if self.is_expired:
+            return self.State.EXPIRED
+        if self.is_redeemed:
+            return self.State.REDEEMED
+        return self.State.ACTIVE
+
+    @property
+    def state_label(self):
+        return self.State(self.state).label
+
+    @classmethod
+    def lookup(cls, code):
+        """Return ``(card, error)`` for a user-entered code."""
+        code = (code or "").strip()
+        if not code:
+            return None, "Enter a gift card code."
+        card = cls.objects.filter(code__iexact=code).first()
+        if card is None:
+            return None, "We couldn't find that gift card."
+        if not card.is_active:
+            return None, "That gift card has been disabled."
+        if card.is_expired:
+            return None, "That gift card has expired."
+        if card.is_redeemed:
+            return None, "That gift card has no balance left."
+        return card, None
+
+    def redeem(self, amount):
+        """Deduct up to ``amount`` from the balance and return the amount used."""
+        amount = Decimal(amount).quantize(Decimal("0.01"))
+        if amount <= 0:
+            return Decimal("0.00")
+        applied = min(amount, self.balance).quantize(Decimal("0.01"))
+        self.balance = (self.balance - applied).quantize(Decimal("0.01"))
+        self.save(update_fields=["balance", "updated_at"])
+        return applied
+
+    def credit(self, amount):
+        """Return ``amount`` to the balance (used on refunds)."""
+        amount = Decimal(amount).quantize(Decimal("0.01"))
+        if amount <= 0:
+            return Decimal("0.00")
+        self.balance = (self.balance + amount).quantize(Decimal("0.01"))
+        self.save(update_fields=["balance", "updated_at"])
+        return amount
+
+
+class GiftCardTransaction(models.Model):
+    """Immutable ledger of gift card balance movements."""
+
+    class Kind(models.TextChoices):
+        ISSUE = "issue", "Issued"
+        REDEMPTION = "redemption", "Redeemed"
+        REFUND = "refund", "Refunded"
+        ADJUSTMENT = "adjustment", "Adjustment"
+
+    gift_card = models.ForeignKey(
+        GiftCard, on_delete=models.CASCADE, related_name="transactions"
+    )
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="gift_card_transactions",
+    )
+    kind = models.CharField(max_length=12, choices=Kind.choices, default=Kind.ISSUE)
+    amount = models.DecimalField(
+        max_digits=10, decimal_places=2, help_text="Signed: negative when redeemed."
+    )
+    balance_after = models.DecimalField(max_digits=10, decimal_places=2)
+    note = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.gift_card.code} {self.kind} {self.amount}"
+
+
+class AbandonedCart(models.Model):
+    """Snapshot of a session cart that was left before checkout."""
+
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        RECOVERED = "recovered", "Recovered"
+        EXPIRED = "expired", "Expired"
+
+    session_key = models.CharField(max_length=40, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="abandoned_carts",
+    )
+    email = models.EmailField(blank=True)
+    items = models.JSONField(default=list, blank=True)
+    item_count = models.PositiveIntegerField(default=0)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    status = models.CharField(
+        max_length=12, choices=Status.choices, default=Status.OPEN
+    )
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="recovered_carts",
+    )
+    reminders_sent = models.PositiveIntegerField(default=0)
+    last_reminder_at = models.DateTimeField(blank=True, null=True)
+    recovered_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        verbose_name = "Abandoned cart"
+        indexes = [
+            models.Index(fields=["status", "updated_at"]),
+            models.Index(fields=["session_key", "status"]),
+        ]
+
+    def __str__(self):
+        return f"Cart #{self.pk} ({self.recipient_email or 'no email'})"
+
+    @property
+    def recipient_email(self):
+        if self.email:
+            return self.email
+        if self.user_id:
+            return self.user.email
+        return ""
+
+    def can_remind(self, max_reminders=2):
+        return (
+            self.status == self.Status.OPEN
+            and bool(self.recipient_email)
+            and self.reminders_sent < max_reminders
+        )

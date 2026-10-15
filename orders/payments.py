@@ -12,7 +12,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.utils import timezone
 
-from .models import Order, OrderStatusHistory, Payment
+from .models import GiftCardTransaction, Order, OrderStatusHistory, Payment
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +153,20 @@ def refund_order(order: Order, amount: Decimal | None = None, user=None):
     from inventory.services import restore_for_order
 
     restore_for_order(order, user=user)
+
+    # Return any gift card amount that was applied to the order.
+    if order.gift_card_id and order.gift_card_amount:
+        card = order.gift_card
+        credited = card.credit(order.gift_card_amount)
+        GiftCardTransaction.objects.create(
+            gift_card=card,
+            order=order,
+            kind=GiftCardTransaction.Kind.REFUND,
+            amount=credited,
+            balance_after=card.balance,
+            note=f"Refunded from order {order.number}",
+        )
+
     OrderStatusHistory.objects.create(
         order=order, status=Order.Status.REFUNDED, changed_by=user, note=f"Refunded {amount}"
     )

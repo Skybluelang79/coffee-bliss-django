@@ -359,6 +359,100 @@ class NewsletterSubscriber(TimeStampedModel):
         return self.email
 
 
+class BrewGuide(TimeStampedModel):
+    """A step-by-step recipe for brewing a product at home."""
+
+    class Method(models.TextChoices):
+        POUR_OVER = "pour_over", "Pour over"
+        ESPRESSO = "espresso", "Espresso"
+        FRENCH_PRESS = "french_press", "French press"
+        AEROPRESS = "aeropress", "AeroPress"
+        MOKA = "moka", "Moka pot"
+        COLD_BREW = "cold_brew", "Cold brew"
+        DRIP = "drip", "Drip machine"
+
+    class Difficulty(models.TextChoices):
+        EASY = "easy", "Easy"
+        MEDIUM = "medium", "Medium"
+        ADVANCED = "advanced", "Advanced"
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name="brew_guides"
+    )
+    title = models.CharField(max_length=160)
+    method = models.CharField(
+        max_length=20, choices=Method.choices, default=Method.POUR_OVER
+    )
+    description = models.TextField(blank=True)
+    difficulty = models.CharField(
+        max_length=10, choices=Difficulty.choices, default=Difficulty.EASY
+    )
+    total_time_minutes = models.PositiveIntegerField(default=5)
+    yield_text = models.CharField(
+        max_length=80, blank=True, help_text="e.g. '1 cup (250 ml)'"
+    )
+    water_temp_c = models.PositiveIntegerField(
+        blank=True, null=True, help_text="Water temperature in Celsius."
+    )
+    grind = models.CharField(max_length=80, blank=True, help_text="e.g. 'Medium-fine'")
+    ratio = models.CharField(
+        max_length=40, blank=True, help_text="Coffee-to-water ratio, e.g. '1:15'"
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+    is_published = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+        verbose_name = "Brew guide"
+        indexes = [models.Index(fields=["product", "is_published"])]
+
+    def __str__(self):
+        return f"{self.title} ({self.product.name})"
+
+    @property
+    def step_count(self):
+        return self.steps.count()
+
+
+class BrewStep(TimeStampedModel):
+    guide = models.ForeignKey(
+        BrewGuide, on_delete=models.CASCADE, related_name="steps"
+    )
+    order = models.PositiveIntegerField(default=0)
+    title = models.CharField(max_length=140)
+    instruction = models.TextField()
+    duration_seconds = models.PositiveIntegerField(
+        blank=True, null=True, help_text="How long this step takes."
+    )
+    tip = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+        verbose_name = "Brew step"
+
+    def __str__(self):
+        return f"{self.order}. {self.title}"
+
+
+class BaristaNote(TimeStampedModel):
+    """A short piece of advice from a barista, shown on a product page."""
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name="barista_notes"
+    )
+    author = models.CharField(max_length=120, blank=True)
+    body = models.TextField()
+    sort_order = models.PositiveIntegerField(default=0)
+    is_published = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+        verbose_name = "Barista note"
+
+    def __str__(self):
+        return f"Note on {self.product.name}"
+
+
 class Favorite(TimeStampedModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="favorites"

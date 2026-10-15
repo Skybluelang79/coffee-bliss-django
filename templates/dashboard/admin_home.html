@@ -77,6 +77,26 @@
         </div>
       </div>
 
+      <div class="card panel">
+        <div class="flex between center mb-1">
+          <h3>Abandoned carts</h3>
+          <form method="post" action="{% url 'dashboard:send_cart_reminders' %}">
+            {% csrf_token %}
+            <button class="btn btn-ghost btn-sm">Send reminders</button>
+          </form>
+        </div>
+        <p class="small muted mb-1">{{ abandoned_count }} open cart{{ abandoned_count|pluralize }} · {{ currency_symbol }}{{ abandoned_value|floatformat:2 }} potential</p>
+        {% for cart in abandoned_carts %}
+          <div class="flex between center" style="padding:.45rem 0;border-bottom:1px solid var(--line)">
+            <span class="small">{{ cart.recipient_email|default:"(no email)" }}</span>
+            <span class="small muted">{{ cart.item_count }} item{{ cart.item_count|pluralize }} · {{ currency_symbol }}{{ cart.subtotal|floatformat:2 }}</span>
+          </div>
+        {% empty %}
+          <p class="muted small">No abandoned carts — nice work!</p>
+        {% endfor %}
+        <a href="/django-admin/orders/abandonedcart/" class="btn btn-ghost btn-sm mt-2">Manage in Django admin</a>
+      </div>
+
       {% if pending_reviews %}
       <div class="card panel">
         <h3>Pending reviews</h3>

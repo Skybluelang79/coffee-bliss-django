@@ -5,6 +5,48 @@ from store.models import Coupon, StoreLocation
 from .models import Order, Reservation
 
 
+class CartEmailForm(forms.Form):
+    email = forms.EmailField(
+        widget=forms.EmailInput(
+            attrs={"class": "form-input", "placeholder": "you@example.com"}
+        )
+    )
+
+
+class GiftCardGenerateForm(forms.Form):
+    quantity = forms.IntegerField(
+        min_value=1,
+        max_value=500,
+        initial=10,
+        widget=forms.NumberInput(attrs={"class": "form-input", "min": 1}),
+    )
+    amount = forms.DecimalField(
+        min_value=1,
+        max_digits=10,
+        decimal_places=2,
+        initial=5000,
+        widget=forms.NumberInput(attrs={"class": "form-input", "step": "0.01"}),
+    )
+    recipient_email = forms.EmailField(
+        required=False,
+        widget=forms.EmailInput(
+            attrs={"class": "form-input", "placeholder": "Optional — one card per email"}
+        ),
+    )
+    expires_in_days = forms.IntegerField(
+        required=False,
+        min_value=1,
+        widget=forms.NumberInput(
+            attrs={"class": "form-input", "placeholder": "Never"}
+        ),
+    )
+    note = forms.CharField(
+        required=False,
+        max_length=255,
+        widget=forms.TextInput(attrs={"class": "form-input", "placeholder": "Internal note (optional)"}),
+    )
+
+
 class CheckoutForm(forms.Form):
     fulfilment_choices = Order.Fulfillment.choices
 

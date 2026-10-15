@@ -25,6 +25,7 @@
       <div class="summary-row"><span>Delivery</span><span>{{ currency_symbol }}{{ order.delivery_fee|floatformat:2 }}</span></div>
       <div class="summary-row"><span>Tax</span><span>{{ currency_symbol }}{{ order.tax|floatformat:2 }}</span></div>
       {% if order.loyalty_discount %}<div class="summary-row"><span>Loyalty</span><span style="color:var(--success)">-{{ currency_symbol }}{{ order.loyalty_discount|floatformat:2 }}</span></div>{% endif %}
+      {% if order.gift_card_amount %}<div class="summary-row"><span>Gift card{% if order.gift_card %} ({{ order.gift_card.code }}){% endif %}</span><span style="color:var(--success)">-{{ currency_symbol }}{{ order.gift_card_amount|floatformat:2 }}</span></div>{% endif %}
       <div class="summary-row total"><span>Total</span><span>{{ currency_symbol }}{{ order.total|floatformat:2 }}</span></div>
       {% if order.points_earned %}<p class="pill-note mt-2">⭐ You earned {{ order.points_earned }} loyalty beans on this order!</p>{% endif %}
     </div>

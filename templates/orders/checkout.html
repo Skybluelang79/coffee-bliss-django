@@ -62,6 +62,7 @@
         <div class="summary-row"><span>Delivery</span><span>{% if cart.delivery_fee %}{{ currency_symbol }}{{ cart.delivery_fee|floatformat:2 }}{% else %}Free{% endif %}</span></div>
         <div class="summary-row"><span>Tax</span><span>{{ currency_symbol }}{{ cart.tax|floatformat:2 }}</span></div>
         {% if cart.loyalty_discount %}<div class="summary-row"><span>Loyalty</span><span style="color:var(--success)">-{{ currency_symbol }}{{ cart.loyalty_discount|floatformat:2 }}</span></div>{% endif %}
+        {% if cart.gift_card_discount %}<div class="summary-row"><span>Gift card{% if cart.get_gift_card %} ({{ cart.get_gift_card.code }}){% endif %}</span><span style="color:var(--success)">-{{ currency_symbol }}{{ cart.gift_card_discount|floatformat:2 }}</span></div>{% endif %}
         <div class="summary-row total"><span>Total</span><span>{{ currency_symbol }}{{ cart.grand_total|floatformat:2 }}</span></div>
         <div class="field mt-2">{{ form.coupon_code }}{{ form.coupon_code.errors }}</div>
         {% if user.is_authenticated and user.loyalty_points %}

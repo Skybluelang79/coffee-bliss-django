@@ -128,6 +128,10 @@ def product_detail(request, slug):
         request.user.is_authenticated
         and Favorite.objects.filter(user=request.user, product=product).exists()
     )
+    brew_guides = product.brew_guides.filter(is_published=True).prefetch_related(
+        "steps"
+    )
+    barista_notes = product.barista_notes.filter(is_published=True)
     context = {
         "product": product,
         "related": related,
@@ -136,6 +140,8 @@ def product_detail(request, slug):
         "can_review": can_review,
         "is_favorite": is_favorite,
         "rating_breakdown": _rating_breakdown(product),
+        "brew_guides": brew_guides,
+        "barista_notes": barista_notes,
     }
     return render(request, "store/product_detail.html", context)
 

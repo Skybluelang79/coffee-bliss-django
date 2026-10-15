@@ -15,7 +15,10 @@ from accounts.models import Address, LoyaltyTransaction, User
 from inventory.models import Ingredient, RecipeItem, StockMovement, Supplier
 from orders.models import Order, OrderItem, OrderStatusHistory, Payment, Reservation, Table
 from store.models import (
+    BaristaNote,
     BlogPost,
+    BrewGuide,
+    BrewStep,
     Category,
     Coupon,
     NewsletterSubscriber,
@@ -66,6 +69,7 @@ class Command(BaseCommand):
         self._blog(admin)
         self._subscribers()
         self._reviews(products)
+        self._brew_guides(products)
         self._inventory(products)
         self._orders(products, locations)
 
@@ -319,6 +323,114 @@ class Command(BaseCommand):
                         "is_verified_purchase": random.choice([True, False]),
                     },
                 )
+
+    def _brew_guides(self, products):
+        by_name = {p.name: p for p in products}
+        guides = [
+            {
+                "product": "Signature House Blend",
+                "title": "The everyday pour-over",
+                "method": "pour_over",
+                "description": "A forgiving, repeatable recipe that shows off the house blend's chocolate and nut notes.",
+                "difficulty": "easy",
+                "total_time_minutes": 5,
+                "ratio": "1:15",
+                "grind": "Medium-fine",
+                "water_temp_c": 94,
+                "yield_text": "1 cup (300 ml)",
+                "steps": [
+                    ("Rinse the filter", "Place a paper filter in your dripper and rinse it with hot water to warm the vessel and remove any papery taste.", 20, "Tip the rinse water away before you start."),
+                    ("Add the coffee", "Weigh 20 g of medium-fine ground coffee into the filter and level the bed.", 15, ""),
+                    ("Bloom", "Pour 60 ml of water and wait for the coffee to bloom and release its gases.", 35, "Fresh beans will bubble enthusiastically here."),
+                    ("First pour", "Pour in slow circles up to 180 ml, keeping the bed even.", 30, ""),
+                    ("Finish", "Top up to 300 ml, then let it drain fully.", 60, "Pull the dripper off before the bed dries out."),
+                ],
+            },
+            {
+                "product": "Classic Espresso",
+                "title": "Dial in the perfect double shot",
+                "method": "espresso",
+                "description": "A 1:2 classic espresso recipe you can fine-tune to taste.",
+                "difficulty": "medium",
+                "total_time_minutes": 3,
+                "ratio": "1:2",
+                "grind": "Fine",
+                "water_temp_c": 93,
+                "yield_text": "36 g out",
+                "steps": [
+                    ("Dose", "Grind 18 g of coffee into your dry basket.", 15, "A dry basket keeps the dose consistent."),
+                    ("Distribute & tamp", "Level the grounds, then tamp straight down with firm, even pressure.", 15, "Consistency beats brute force on the tamp."),
+                    ("Extract", "Start the shot immediately and watch the flow.", 28, "Aim for 36 g out in 25–30 seconds."),
+                    ("Taste & adjust", "Too fast and sour? Grind finer. Slow and bitter? Grind coarser.", 20, "Change one variable at a time."),
+                ],
+            },
+            {
+                "product": "Vanilla Cold Brew",
+                "title": "Overnight cold brew concentrate",
+                "method": "cold_brew",
+                "description": "Smooth, low-acid cold brew you can keep in the fridge all week.",
+                "difficulty": "easy",
+                "total_time_minutes": 720,
+                "ratio": "1:5",
+                "grind": "Coarse",
+                "yield_text": "600 ml concentrate",
+                "steps": [
+                    ("Combine", "Add 120 g of coarsely ground coffee to 600 ml of cold filtered water.", 60, "Coarse grounds keep the brew clean."),
+                    ("Steep", "Cover and leave in the fridge to steep.", 64800, "12–18 hours is the sweet spot."),
+                    ("Strain", "Strain through a fine sieve lined with a paper filter.", 120, "Avoid pressing the grounds — it adds bitterness."),
+                    ("Serve", "Dilute 1:1 with water or milk over ice.", 30, "Keeps for up to a week refrigerated."),
+                ],
+            },
+        ]
+        guide_count = 0
+        for data in guides:
+            product = by_name.get(data["product"])
+            if not product:
+                continue
+            guide, _ = BrewGuide.objects.get_or_create(
+                product=product,
+                title=data["title"],
+                defaults={
+                    "method": data["method"],
+                    "description": data["description"],
+                    "difficulty": data["difficulty"],
+                    "total_time_minutes": data["total_time_minutes"],
+                    "ratio": data["ratio"],
+                    "grind": data["grind"],
+                    "water_temp_c": data.get("water_temp_c"),
+                    "yield_text": data["yield_text"],
+                },
+            )
+            if guide.steps.count() == 0:
+                for i, (title, instruction, duration, tip) in enumerate(data["steps"]):
+                    BrewStep.objects.create(
+                        guide=guide,
+                        order=i,
+                        title=title,
+                        instruction=instruction,
+                        duration_seconds=duration,
+                        tip=tip,
+                    )
+            guide_count += 1
+
+        notes = [
+            ("Signature House Blend", "Marta, Head Roaster", "Let the beans rest a few days after roast — the chocolate notes really open up."),
+            ("Classic Espresso", "Sam, Lead Barista", "If the shot runs sour, don't touch the recipe yet — try a slightly finer grind first."),
+            ("Nitro Cold Brew", "Nadia, Café Manager", "Serve it cold, cold, cold. Room-temperature glassware kills the cascade."),
+        ]
+        note_count = 0
+        for product_name, author, body in notes:
+            product = by_name.get(product_name)
+            if not product:
+                continue
+            BaristaNote.objects.get_or_create(
+                product=product, body=body, defaults={"author": author}
+            )
+            note_count += 1
+
+        self.stdout.write(
+            f"Seeded {guide_count} brew guides and {note_count} barista notes."
+        )
 
     def _inventory(self, products):
         suppliers_data = [

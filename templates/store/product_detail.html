@@ -166,6 +166,59 @@
   </div>
 </section>
 
+{% if brew_guides or barista_notes %}
+<section class="block">
+  <div class="container">
+    <div class="section-head reveal"><div><span class="eyebrow">Make it at home</span><h2>Brew guide &amp; barista notes</h2></div></div>
+
+    {% if barista_notes %}
+    <div class="card panel reveal">
+      <h3>Barista notes</h3>
+      <div class="barista-notes">
+        {% for note in barista_notes %}
+          <blockquote class="barista-note">
+            <p>{{ note.body }}</p>
+            {% if note.author %}<cite>— {{ note.author }}</cite>{% endif %}
+          </blockquote>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% for guide in brew_guides %}
+    <div class="card panel reveal mt-2">
+      <div class="flex between center wrap">
+        <h3 style="margin-bottom:.3rem">{{ guide.title }}</h3>
+        <span class="badge">{{ guide.step_count }} step{{ guide.step_count|pluralize }}</span>
+      </div>
+      <div class="chip-row">
+        <span class="pill-note">⚙️ {{ guide.get_method_display }}</span>
+        <span class="pill-note">⏱ ~{{ guide.total_time_minutes }} min</span>
+        <span class="pill-note">🎯 {{ guide.get_difficulty_display }}</span>
+        {% if guide.ratio %}<span class="pill-note">⚖️ {{ guide.ratio }}</span>{% endif %}
+        {% if guide.grind %}<span class="pill-note">🫘 {{ guide.grind }}</span>{% endif %}
+        {% if guide.water_temp_c %}<span class="pill-note">🌡️ {{ guide.water_temp_c }}°C</span>{% endif %}
+        {% if guide.yield_text %}<span class="pill-note">☕ {{ guide.yield_text }}</span>{% endif %}
+      </div>
+      {% if guide.description %}<p class="mt-2">{{ guide.description }}</p>{% endif %}
+      <ol class="brew-steps mt-2">
+        {% for step in guide.steps.all %}
+          <li class="brew-step">
+            <span class="brew-step-no">{{ forloop.counter }}</span>
+            <div>
+              <strong>{{ step.title }}</strong>{% if step.duration_seconds %} <span class="muted small">· {{ step.duration_seconds }}s</span>{% endif %}
+              <p class="small">{{ step.instruction }}</p>
+              {% if step.tip %}<p class="pill-note small">💡 {{ step.tip }}</p>{% endif %}
+            </div>
+          </li>
+        {% endfor %}
+      </ol>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 {% if related %}
 <section class="block">
   <div class="container">
