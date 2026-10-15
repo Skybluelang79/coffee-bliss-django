@@ -536,13 +536,23 @@ class Command(BaseCommand):
 
     def _orders(self, products, locations):
         customers = list(User.objects.filter(role=User.Role.CUSTOMER))
-        statuses = ["pending", "confirmed", "preparing", "ready", "completed", "completed", "completed"]
         for i in range(20):
             user = random.choice(customers)
             fulfillment = random.choice(["pickup", "delivery", "dine_in"])
+            # Keep demo orders recent (within the last ~6 hours) so the live
+            # kitchen board and "today" reports look realistic.
+            minutes_ago = random.randint(1, 360)
+            if minutes_ago < 60:
+                status = random.choice(["pending", "confirmed", "preparing", "ready"])
+            elif minutes_ago < 180:
+                status = random.choice(["confirmed", "preparing", "ready", "completed", "completed"])
+            else:
+                status = random.choice(
+                    ["ready", "out_for_delivery", "completed", "completed", "completed"]
+                )
             order = Order.objects.create(
                 user=user,
-                status=random.choice(statuses),
+                status=status,
                 fulfillment=fulfillment,
                 location=random.choice(locations),
                 customer_name=user.get_full_name(),
@@ -559,7 +569,7 @@ class Command(BaseCommand):
                 )
             order = order.recalculate()
             order.payment_status = Order.PaymentStatus.PAID
-            placed = timezone.now() - timedelta(days=random.randint(0, 28))
+            placed = timezone.now() - timedelta(minutes=minutes_ago)
             order.placed_at = placed
             order.save()
             Order.objects.filter(pk=order.pk).update(created_at=placed)

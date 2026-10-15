@@ -122,8 +122,11 @@ def staff_kds(request):
         Order.Status.READY,
         Order.Status.OUT_FOR_DELIVERY,
     ]
+    # Only surface the last 24 hours so old demo/backlogged orders don't flood
+    # the live board.
+    cutoff = timezone.now() - timedelta(hours=24)
     orders = (
-        Order.objects.filter(status__in=active_statuses)
+        Order.objects.filter(status__in=active_statuses, placed_at__gte=cutoff)
         .prefetch_related("items")
         .order_by("placed_at")
     )
