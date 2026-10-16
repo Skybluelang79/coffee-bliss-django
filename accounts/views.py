@@ -2,7 +2,14 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.views import LoginView, PasswordChangeView
+from django.contrib.auth.views import (
+    LoginView,
+    PasswordChangeView,
+    PasswordResetView,
+    PasswordResetDoneView,
+    PasswordResetConfirmView,
+    PasswordResetCompleteView,
+)
 from django.db import IntegrityError, transaction
 from django.shortcuts import redirect, render, get_object_or_404
 from django.urls import reverse_lazy
@@ -17,6 +24,8 @@ from .forms import (
     ProfileForm,
     AddressForm,
     CoffeePasswordChangeForm,
+    CoffeePasswordResetForm,
+    CoffeeSetPasswordForm,
 )
 from .models import Address, LoyaltyTransaction
 
@@ -160,3 +169,34 @@ class CoffeePasswordChangeView(PasswordChangeView):
         update_session_auth_hash(self.request, form.user)
         messages.success(self.request, "Password changed successfully.")
         return response
+
+
+class CoffeePasswordResetView(PasswordResetView):
+    template_name = "accounts/password_reset.html"
+    form_class = CoffeePasswordResetForm
+    email_template_name = "emails/password_reset.txt"
+    html_email_template_name = "emails/password_reset.html"
+    subject_template_name = "emails/password_reset_subject.txt"
+    success_url = reverse_lazy("accounts:password_reset_done")
+    extra_email_context = {"site_name": settings.SITE_NAME}
+
+    def form_valid(self, form):
+        messages.info(
+            self.request,
+            "If an account matches that email, a reset link is on its way.",
+        )
+        return super().form_valid(form)
+
+
+class CoffeePasswordResetDoneView(PasswordResetDoneView):
+    template_name = "accounts/password_reset_done.html"
+
+
+class CoffeePasswordResetConfirmView(PasswordResetConfirmView):
+    template_name = "accounts/password_reset_confirm.html"
+    form_class = CoffeeSetPasswordForm
+    success_url = reverse_lazy("accounts:password_reset_complete")
+
+
+class CoffeePasswordResetCompleteView(PasswordResetCompleteView):
+    template_name = "accounts/password_reset_complete.html"

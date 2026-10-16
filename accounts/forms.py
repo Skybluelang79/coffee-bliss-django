@@ -3,6 +3,8 @@ from django.contrib.auth.forms import (
     AuthenticationForm,
     UserCreationForm,
     PasswordChangeForm,
+    PasswordResetForm,
+    SetPasswordForm,
 )
 from django.utils.translation import gettext_lazy as _
 
@@ -34,6 +36,16 @@ class LoginForm(StyledFormMixin, AuthenticationForm):
         label=_("Email"),
         widget=forms.EmailInput(attrs={"autofocus": True, "autocomplete": "email"}),
     )
+    password = forms.CharField(
+        label=_("Password"),
+        strip=False,
+        widget=forms.PasswordInput(
+            attrs={
+                "autocomplete": "current-password",
+                "data-caps-hint": "caps-hint-login",
+            }
+        ),
+    )
     remember_me = forms.BooleanField(
         required=False, label=_("Remember me"), initial=True
     )
@@ -51,6 +63,25 @@ class SignUpForm(StyledFormMixin, UserCreationForm):
     class Meta:
         model = User
         fields = ("first_name", "last_name", "email", "phone", "password1", "password2")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        autocomplete = {
+            "first_name": "given-name",
+            "last_name": "family-name",
+            "email": "email",
+            "phone": "tel",
+            "password1": "new-password",
+            "password2": "new-password",
+        }
+        for name, value in autocomplete.items():
+            if name in self.fields:
+                self.fields[name].widget.attrs.setdefault("autocomplete", value)
+        # Live inline validation hooks (progressive enhancement, static/js/main.js).
+        self.fields["email"].widget.attrs["data-live-validate"] = "email"
+        self.fields["password2"].widget.attrs.update(
+            {"data-live-validate": "match", "data-match-with": "id_password1"}
+        )
 
     def clean_email(self):
         email = self.cleaned_data["email"].lower()
@@ -105,3 +136,19 @@ class AddressForm(StyledFormMixin, forms.ModelForm):
 
 class CoffeePasswordChangeForm(StyledFormMixin, PasswordChangeForm):
     pass
+
+
+class CoffeePasswordResetForm(StyledFormMixin, PasswordResetForm):
+    email = forms.EmailField(
+        label=_("Email"),
+        widget=forms.EmailInput(attrs={"autofocus": True, "autocomplete": "email"}),
+    )
+
+
+class CoffeeSetPasswordForm(StyledFormMixin, SetPasswordForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "new_password2" in self.fields:
+            self.fields["new_password2"].widget.attrs.update(
+                {"data-live-validate": "match", "data-match-with": "id_new_password1"}
+            )

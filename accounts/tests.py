@@ -69,3 +69,92 @@ class AccountTests(TestCase):
     def test_dashboard_requires_login(self):
         response = self.client.get(reverse("accounts:dashboard"))
         self.assertEqual(response.status_code, 302)
+
+
+class LoginPageTests(TestCase):
+    def test_login_page_has_enhanced_features(self):
+        response = self.client.get(reverse("accounts:login"))
+        self.assertContains(response, reverse("accounts:password_reset"))
+        self.assertContains(response, "data-pw-toggle")
+        self.assertContains(response, reverse("orders:track_lookup"))
+
+    def test_demo_credentials_hidden_when_debug_off(self):
+        # The test runner forces DEBUG=False, so demo credentials must not leak.
+        response = self.client.get(reverse("accounts:login"))
+        self.assertNotContains(response, "admin@coffeebliss.test")
+
+
+class PasswordResetTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="ada@example.com", password="testpass123", first_name="Ada"
+        )
+
+    def test_reset_pages_render(self):
+        for name in ("password_reset", "password_reset_done", "password_reset_complete"):
+            response = self.client.get(reverse(f"accounts:{name}"))
+            self.assertEqual(response.status_code, 200)
+
+    def test_reset_sends_branded_email(self):
+        from django.core import mail
+
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"
+        ):
+            response = self.client.post(
+                reverse("accounts:password_reset"), {"email": "ada@example.com"}
+            )
+        self.assertRedirects(response, reverse("accounts:password_reset_done"))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Coffee Bliss", mail.outbox[0].subject)
+        self.assertIn("password-reset", mail.outbox[0].body)
+
+    def test_full_reset_flow_sets_new_password(self):
+        from django.core import mail
+        import re
+
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"
+        ):
+            self.client.post(
+                reverse("accounts:password_reset"), {"email": "ada@example.com"}
+            )
+        body = mail.outbox[0].body
+        link = re.search(r"http://testserver/accounts/password-reset/\S+", body).group(0)
+
+        # Visiting the emailed link redirects to the internal set-password URL.
+        response = self.client.get(link, follow=True)
+        set_url = response.request["PATH_INFO"]
+        self.assertTrue(set_url.endswith("/set-password/"))
+
+        response = self.client.post(
+            set_url, {"new_password1": "NewBrew!2026", "new_password2": "NewBrew!2026"}
+        )
+        self.assertRedirects(response, reverse("accounts:password_reset_complete"))
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("NewBrew!2026"))
+        self.assertTrue(self.client.login(email="ada@example.com", password="NewBrew!2026"))
+
+    def test_reused_link_shows_invalid_page(self):
+        from django.core import mail
+        import re
+
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"
+        ):
+            self.client.post(
+                reverse("accounts:password_reset"), {"email": "ada@example.com"}
+            )
+        link = re.search(
+            r"http://testserver/accounts/password-reset/\S+", mail.outbox[0].body
+        ).group(0)
+
+        first = self.client.get(link, follow=True)
+        self.client.post(
+            first.request["PATH_INFO"],
+            {"new_password1": "NewBrew!2026", "new_password2": "NewBrew!2026"},
+        )
+
+        response = self.client.get(link, follow=True)
+        self.assertContains(response, "no longer")

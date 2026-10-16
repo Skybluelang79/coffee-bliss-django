@@ -30,43 +30,95 @@
     {% endfor %}
   </div>
 
-  <nav class="navbar">
+  <div class="topbar">
+    <div class="container topbar-inner">
+      <span class="topbar-msg">
+        <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 17h4V5H2v12h3"/><path d="M2 9h8"/><path d="M14 9h4l4 4v4h-4"/><circle cx="7.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/></svg>
+        Free delivery on orders over {{ currency_symbol }}{{ free_delivery_threshold|floatformat:0|intcomma }}
+      </span>
+      <div class="topbar-links">
+        <a href="{% url 'orders:track_lookup' %}">Track order</a>
+        <a href="{% url 'store:locations' %}">Find a café</a>
+        <a href="{% url 'store:subscriptions' %}">Coffee Club</a>
+      </div>
+    </div>
+  </div>
+
+  <nav class="navbar" id="navbar" data-navbar>
     <div class="container nav-inner">
-      <a href="{% url 'store:home' %}" class="brand">
-        <span class="brand-mark">☕</span>
+      <a href="{% url 'store:home' %}" class="brand" aria-label="{{ SITE_NAME }} — home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5Z"/><path d="M17 9h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M7 3v2M11 2v3M15 3v2"/></svg>
+        </span>
         <span>Coffee <span class="gradient-text">Bliss</span></span>
       </a>
 
       <div class="nav-links" id="nav-links">
-        <a href="{% url 'store:menu' %}" class="{% if request.resolver_match.url_name == 'menu' %}active{% endif %}">Menu</a>
-        <a href="{% url 'store:subscriptions' %}">Coffee Club</a>
-        <a href="{% url 'orders:reserve' %}">Reserve</a>
-        <a href="{% url 'store:locations' %}">Locations</a>
-        <a href="{% url 'store:blog' %}">Journal</a>
-        <a href="{% url 'store:about' %}">About</a>
+        <a href="{% url 'store:menu' %}" class="{% if request.resolver_match.url_name == 'menu' or request.resolver_match.url_name == 'product_detail' or request.resolver_match.url_name == 'categories' %}active{% endif %}">Menu</a>
+        <a href="{% url 'store:subscriptions' %}" class="{% if request.resolver_match.url_name == 'subscriptions' %}active{% endif %}">Coffee Club</a>
+        <a href="{% url 'orders:reserve' %}" class="{% if request.resolver_match.url_name == 'reserve' or request.resolver_match.url_name == 'reservation_success' %}active{% endif %}">Reserve</a>
+        <a href="{% url 'store:locations' %}" class="{% if request.resolver_match.url_name == 'locations' %}active{% endif %}">Locations</a>
+        <a href="{% url 'store:blog' %}" class="{% if request.resolver_match.url_name == 'blog' or request.resolver_match.url_name == 'blog_detail' %}active{% endif %}">Journal</a>
+        <a href="{% url 'store:about' %}" class="{% if request.resolver_match.url_name == 'about' or request.resolver_match.url_name == 'contact' %}active{% endif %}">About</a>
+
+        <div class="nav-mobile-actions">
+          <a href="{% url 'orders:track_lookup' %}" class="nav-mobile-link">
+            <svg class="icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            Track order
+          </a>
+          {% if user.is_authenticated %}
+            {% if user.is_staff_member %}
+              <a href="{% if user.is_manager %}{% url 'dashboard:admin_home' %}{% else %}{% url 'dashboard:staff_home' %}{% endif %}" class="nav-mobile-link">Dashboard</a>
+            {% else %}
+              <a href="{% url 'accounts:dashboard' %}" class="nav-mobile-link">My account</a>
+            {% endif %}
+            <a href="{% url 'accounts:logout' %}" class="btn btn-block">Sign out</a>
+          {% else %}
+            <a href="{% url 'accounts:login' %}" class="btn btn-ghost btn-block">Sign in</a>
+            <a href="{% url 'accounts:signup' %}" class="btn btn-block">Join free — get 100 beans</a>
+          {% endif %}
+        </div>
       </div>
 
       <div class="nav-actions">
-        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle light and dark theme" title="Toggle theme">
-          <span class="theme-icon" aria-hidden="true">🌙</span>
+        <form class="nav-search" id="nav-search" role="search" action="{% url 'store:menu' %}" method="get">
+          <svg class="icon nav-search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="search" name="q" class="nav-search-input" placeholder="Search coffee, beans, gifts…" value="{{ request.GET.q|default:'' }}" aria-label="Search the menu" />
+          <button type="button" class="nav-search-close" data-search-close aria-label="Close search">&#10005;</button>
+        </form>
+
+        <button class="icon-btn search-toggle" id="search-toggle" type="button" aria-label="Search" aria-expanded="false" aria-controls="nav-search">
+          <svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         </button>
-        <a href="{% url 'orders:track_lookup' %}" class="btn btn-ghost btn-sm">Track</a>
-        <a href="{% url 'orders:cart' %}" class="cart-pill">
-          🛒 <span class="small">Cart</span>
+
+        <div class="nav-actions-desktop">
+          <button class="icon-btn theme-toggle" id="theme-toggle" type="button" aria-label="Toggle light and dark theme" aria-pressed="false" title="Toggle theme">
+            <svg class="icon icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            <svg class="icon icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+          </button>
+          <a href="{% url 'orders:track_lookup' %}" class="nav-icon-link">Track</a>
+          {% if user.is_authenticated %}
+            {% if user.is_staff_member %}
+              <a href="{% if user.is_manager %}{% url 'dashboard:admin_home' %}{% else %}{% url 'dashboard:staff_home' %}{% endif %}" class="btn btn-ghost btn-sm">Dashboard</a>
+            {% else %}
+              <a href="{% url 'accounts:dashboard' %}" class="btn btn-ghost btn-sm">{{ user.get_short_name }}</a>
+            {% endif %}
+            <a href="{% url 'accounts:logout' %}" class="btn btn-sm">Sign out</a>
+          {% else %}
+            <a href="{% url 'accounts:login' %}" class="btn btn-ghost btn-sm">Sign in</a>
+            <a href="{% url 'accounts:signup' %}" class="btn btn-sm">Join free</a>
+          {% endif %}
+        </div>
+
+        <a href="{% url 'orders:cart' %}" class="cart-pill" aria-label="Cart{% if cart_count %}, {{ cart_count }} item{{ cart_count|pluralize }}{% endif %}">
+          <svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          <span class="cart-label">Cart</span>
           {% if cart_count %}<span class="cart-badge">{{ cart_count }}</span>{% endif %}
         </a>
-        {% if user.is_authenticated %}
-          {% if user.is_staff_member %}
-            <a href="{% if user.is_manager %}{% url 'dashboard:admin_home' %}{% else %}{% url 'dashboard:staff_home' %}{% endif %}" class="btn btn-ghost btn-sm">Dashboard</a>
-          {% else %}
-            <a href="{% url 'accounts:dashboard' %}" class="btn btn-ghost btn-sm">{{ user.get_short_name }}</a>
-          {% endif %}
-          <a href="{% url 'accounts:logout' %}" class="btn btn-sm">Sign out</a>
-        {% else %}
-          <a href="{% url 'accounts:login' %}" class="btn btn-ghost btn-sm">Sign in</a>
-          <a href="{% url 'accounts:signup' %}" class="btn btn-sm">Join free</a>
-        {% endif %}
-        <button class="nav-toggle" aria-label="Menu">☰</button>
+
+        <button class="nav-toggle" id="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+          <span class="burger"><span></span><span></span><span></span></span>
+        </button>
       </div>
     </div>
   </nav>
