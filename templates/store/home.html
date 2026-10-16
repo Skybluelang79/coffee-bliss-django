@@ -155,5 +155,6 @@
 
 {% block extra_js %}
 <script>window.heroImage = "{% if hero_image %}{{ hero_image }}{% endif %}";</script>
-<script src="{% static 'js/hero3d.js' %}"></script>
+<script src="{% static 'js/hero3d.js' %}" defer></script>
+<script src="{% static 'js/product3d.js' %}" defer></script>
 {% endblock %}

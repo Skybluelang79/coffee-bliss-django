@@ -5,6 +5,10 @@
       <img src="{{ product.image.url }}" alt="{{ product.name }}" loading="lazy" />
     {% else %}
       <div class="emoji-fallback">{{ product.category.icon|default:"☕" }}</div>
+      <canvas class="product-canvas" width="512" height="384" aria-hidden="true"
+              data-p3d="{{ product.visual_3d }}"
+              data-p3d-liquid="{{ product.visual_liquid }}"
+              data-p3d-roast="{{ product.visual_roast }}"></canvas>
     {% endif %}
     <div class="badges">
       {% if product.discount_percent %}<span class="badge discount">-{{ product.discount_percent }}%</span>{% endif %}

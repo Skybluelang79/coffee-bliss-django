@@ -1,4 +1,5 @@
 from decimal import Decimal
+import re
 
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -159,6 +160,51 @@ class Product(TimeStampedModel):
     @property
     def review_count(self):
         return self.reviews.filter(is_approved=True).count()
+
+    # ---- 3D product visual hints (see static/js/product3d.js) -------------
+    @property
+    def visual_3d(self):
+        """Which 3D model best represents this product."""
+        name = self.name.lower()
+        if self.kind == self.Kind.BEANS:
+            return "bag"
+        if self.kind == self.Kind.FOOD:
+            return "plate"
+        if self.kind == self.Kind.MERCH:
+            return "mug"
+        if re.search(r"\b(cold|iced|nitro|frappe)\b", name):
+            return "glass"
+        if re.search(r"\b(tea|chai|matcha)\b", name):
+            return "teacup"
+        return "cup"
+
+    @property
+    def visual_liquid(self):
+        """Liquid colour for drinks, rendered on the 3D model."""
+        name = self.name.lower()
+        if "matcha" in name:
+            return "#7fa85f"
+        if "chai" in name:
+            return "#c98a4b"
+        if "caramel" in name:
+            return "#b5793a"
+        if "mocha" in name:
+            return "#5a3520"
+        if "vanilla" in name:
+            return "#d9b98a"
+        if "nitro" in name:
+            return "#2c1a10"
+        return "#4a2b18"
+
+    @property
+    def visual_roast(self):
+        """Roast-tinted colour used for coffee bag packaging."""
+        return {
+            self.Roast.LIGHT: "#c69a63",
+            self.Roast.MEDIUM: "#9a6b3f",
+            self.Roast.DARK: "#4a3324",
+            self.Roast.ESPRESSO: "#3a2418",
+        }.get(self.roast, "#9a6b3f")
 
 
 class ProductImage(TimeStampedModel):

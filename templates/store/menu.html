@@ -3,6 +3,10 @@
 
 {% block title %}Menu — {{ SITE_NAME }}{% endblock %}
 
+{% block extra_head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+{% endblock %}
+
 {% block content %}
 <section class="block" style="padding-top:2.5rem">
   <div class="container">
@@ -66,4 +70,8 @@
     {% endif %}
   </div>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/product3d.js' %}" defer></script>
 {% endblock %}

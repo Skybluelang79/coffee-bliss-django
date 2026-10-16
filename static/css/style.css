@@ -92,7 +92,7 @@ html[data-theme="light"] {
 
 html[data-theme="light"] .product-media,
 html[data-theme="light"] .pd-media {
-  background: radial-gradient(circle at 50% 30%, #ffffff, #efe2d0);
+  background: radial-gradient(circle at 50% 30%, #fbf7f1, #ddc9ab);
 }
 html[data-theme="light"] .status.amber { background: rgba(224,168,62,.22); color: #7a5200; }
 html[data-theme="light"] .status.blue { background: rgba(91,155,213,.18); color: #1f5c93; }
@@ -382,6 +382,10 @@ section.block { padding: 4rem 0; }
 .product-media img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s ease; }
 .product-card:hover .product-media img { transform: scale(1.08); }
 .product-media .emoji-fallback { position: absolute; inset: 0; display: grid; place-items: center; font-size: 3.4rem; opacity: .85; }
+.product-media .product-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: none; opacity: 0; transition: opacity .6s ease; }
+.product-media.media-3d-ready .product-canvas { display: block; }
+.product-media.media-3d-ready .product-canvas.is-live { opacity: 1; }
+.product-media.media-3d-ready .emoji-fallback { display: none; }
 .badges { position: absolute; top: .8rem; left: .8rem; display: flex; flex-direction: column; gap: .4rem; z-index: 2; }
 .badge { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: .3rem .6rem; border-radius: 999px; background: var(--accent); color: #fff; }
 .badge.new { background: var(--success); }
@@ -558,6 +562,11 @@ table.data tr:hover td { background: rgba(200,150,62,.04); }
 .pd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: start; }
 .pd-media { position: relative; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); background: radial-gradient(circle at 50% 30%, var(--surface-2), var(--espresso)); aspect-ratio: 1; perspective: 1000px; }
 .pd-media img { width: 100%; height: 100%; object-fit: cover; }
+.pd-emoji { display: grid; place-items: center; height: 100%; font-size: 7rem; }
+.pd-media .product-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: none; opacity: 0; transition: opacity .7s ease; }
+.pd-media.media-3d-ready .product-canvas { display: block; }
+.pd-media.media-3d-ready .product-canvas.is-live { opacity: 1; }
+.pd-media.media-3d-ready .pd-emoji { display: none; }
 .pd-price { font-family: var(--display); font-size: 2.4rem; color: var(--brand-2); }
 .option-group { margin: 1rem 0; }
 .option-group .opts { display: flex; gap: .6rem; flex-wrap: wrap; }

@@ -4,6 +4,10 @@
 {% block title %}{{ product.name }} — {{ SITE_NAME }}{% endblock %}
 {% block meta_description %}{{ product.short_description|default:product.description|truncatechars:150 }}{% endblock %}
 
+{% block extra_head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+{% endblock %}
+
 {% block content %}
 <section class="block" style="padding-top:2.5rem">
   <div class="container">
@@ -14,7 +18,11 @@
         {% if product.image %}
           <img src="{{ product.image.url }}" alt="{{ product.name }}" />
         {% else %}
-          <div style="display:grid;place-items:center;height:100%;font-size:7rem">{{ product.category.icon|default:"☕" }}</div>
+          <div class="pd-emoji">{{ product.category.icon|default:"☕" }}</div>
+          <canvas class="product-canvas" width="640" height="640" aria-hidden="true"
+                  data-p3d="{{ product.visual_3d }}"
+                  data-p3d-liquid="{{ product.visual_liquid }}"
+                  data-p3d-roast="{{ product.visual_roast }}"></canvas>
         {% endif %}
       </div>
 
@@ -229,4 +237,8 @@
   </div>
 </section>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/product3d.js' %}" defer></script>
 {% endblock %}
