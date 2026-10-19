@@ -31,9 +31,6 @@
   --nav-border: rgba(255, 255, 255, 0.05);
   --glass-bg: rgba(30, 22, 19, 0.6);
   --glass-border: rgba(255, 255, 255, 0.08);
-  --hero-card-bg: linear-gradient(160deg, rgba(46, 31, 24, 0.9), rgba(20, 13, 10, 0.85));
-  --hero-card-border: rgba(255, 255, 255, 0.09);
-  --float-chip-bg: rgba(20, 14, 10, 0.92);
   --ghost-bg: rgba(255, 255, 255, 0.04);
   --fav-bg: rgba(20, 14, 10, 0.7);
   --chip-bg: rgba(255, 255, 255, 0.02);
@@ -75,9 +72,6 @@ html[data-theme="light"] {
   --nav-border: rgba(0, 0, 0, 0.07);
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(0, 0, 0, 0.07);
-  --hero-card-bg: linear-gradient(160deg, #ffffff, #f2e6d4);
-  --hero-card-border: rgba(0, 0, 0, 0.08);
-  --float-chip-bg: rgba(255, 255, 255, 0.95);
   --ghost-bg: rgba(0, 0, 0, 0.03);
   --fav-bg: rgba(255, 255, 255, 0.85);
   --chip-bg: rgba(0, 0, 0, 0.02);
@@ -321,38 +315,17 @@ html[data-theme="light"] .icon-moon { display: none; }
 }
 .hero-grid {
   position: relative; z-index: 2;
-  display: grid; grid-template-columns: 1.05fr .95fr; gap: 3rem; align-items: center;
+  display: grid; grid-template-columns: 1fr; justify-items: center; text-align: center;
 }
-.hero-copy { animation: rise 1s ease both; }
+.hero-copy { animation: rise 1s ease both; max-width: 46rem; }
 .hero-copy .eyebrow { display: inline-block; margin-bottom: 1rem; }
 .hero-copy h1 { margin-bottom: 1.1rem; }
-.hero-copy .lead { font-size: 1.12rem; max-width: 34rem; margin-bottom: 2rem; }
-.hero-cta { display: flex; flex-wrap: wrap; gap: .9rem; margin-bottom: 2.4rem; }
-.hero-stats { display: flex; gap: 2.2rem; flex-wrap: wrap; }
+.hero-copy .lead { font-size: 1.12rem; max-width: 34rem; margin: 0 auto 2rem; }
+.hero-cta { display: flex; flex-wrap: wrap; gap: .9rem; margin-bottom: 2.4rem; justify-content: center; }
+.hero-stats { display: flex; gap: 2.2rem; flex-wrap: wrap; justify-content: center; }
 .hero-stats .stat b { display: block; font-family: var(--display); font-size: 1.9rem; color: var(--text); }
 .hero-stats .stat span { font-size: .82rem; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; }
 
-.hero-visual { position: relative; perspective: 1400px; display: grid; place-items: center; min-height: 460px; }
-.hero-card-3d {
-  position: relative; width: min(430px, 90%);
-  border-radius: 28px; padding: 1.4rem;
-  background: var(--hero-card-bg);
-  border: 1px solid var(--hero-card-border);
-  box-shadow: var(--shadow-2), var(--shadow-3d);
-  transform: rotateY(-14deg) rotateX(8deg);
-  transition: transform .5s cubic-bezier(.2, .8, .2, 1);
-  animation: floaty 7s ease-in-out infinite;
-  transform-style: preserve-3d;
-}
-.hero-card-3d img { border-radius: 20px; aspect-ratio: 4 / 3.4; object-fit: cover; width: 100%; }
-.hero-card-3d .float-chip {
-  position: absolute; padding: .6rem .9rem; border-radius: 14px; font-size: .8rem; font-weight: 600;
-  background: var(--float-chip-bg); border: 1px solid var(--line); color: var(--text);
-  box-shadow: var(--shadow-2); transform: translateZ(60px); display: flex; align-items: center; gap: .45rem;
-}
-.chip-1 { top: -18px; left: -22px; animation: floaty 5s ease-in-out infinite; }
-.chip-2 { bottom: 26px; right: -26px; animation: floaty 6.5s ease-in-out infinite reverse; }
-.chip-3 { bottom: -20px; left: 10px; animation: floaty 7.5s ease-in-out infinite; }
 .hero-orb {
   position: absolute; border-radius: 50%; filter: blur(60px); opacity: .5; z-index: 0;
 }
@@ -626,7 +599,6 @@ table.data tr:hover td { background: rgba(200,150,62,.04); }
 .plan li::before { content: "✓"; color: var(--success); font-weight: 700; }
 
 /* ---------- Animations ---------- */
-@keyframes floaty { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-14px) } }
 @keyframes rise { from { opacity: 0; transform: translateY(28px) } to { opacity: 1; transform: none } }
 @keyframes slidein { from { opacity: 0; transform: translateX(30px) } to { opacity: 1; transform: none } }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(210,105,30,.5) } 70% { box-shadow: 0 0 0 12px rgba(210,105,30,0) } 100% { box-shadow: 0 0 0 0 rgba(210,105,30,0) } }
@@ -731,8 +703,6 @@ table.data tr:hover td { background: rgba(200,150,62,.04); }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1024px) {
-  .hero-grid { grid-template-columns: 1fr; }
-  .hero-visual { min-height: 380px; order: -1; }
   .grid-4 { grid-template-columns: repeat(2, 1fr); }
   .footer-grid { grid-template-columns: 1fr 1fr; }
   .dash { grid-template-columns: 1fr; }

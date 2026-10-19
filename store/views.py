@@ -1,11 +1,9 @@
 from django.contrib import messages
-from django.contrib.staticfiles import finders
 from django.core.mail import send_mail
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.db.models import Avg, Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.templatetags.static import static
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
@@ -50,9 +48,6 @@ def home(request):
             ),
             "locations": StoreLocation.objects.filter(is_active=True).count(),
         },
-        "hero_image": static("img/hero-sample.jpg")
-        if finders.find("img/hero-sample.jpg")
-        else "",
     }
     return render(request, "store/home.html", context)
 

@@ -119,18 +119,6 @@
     });
   });
 
-  // Hero card reacts to pointer
-  const heroCard = document.querySelector(".hero-card-3d");
-  if (heroCard && window.matchMedia("(pointer:fine)").matches) {
-    const hero = heroCard.closest(".hero");
-    hero.addEventListener("pointermove", (e) => {
-      const r = hero.getBoundingClientRect();
-      const px = (e.clientX - r.left) / r.width - 0.5;
-      const py = (e.clientY - r.top) / r.height - 0.5;
-      heroCard.style.transform = `rotateY(${-14 + px * 16}deg) rotateX(${8 - py * 14}deg)`;
-    });
-  }
-
   // Newsletter / inline forms: basic client validation
   document.querySelectorAll("form[data-validate]").forEach((form) => {
     form.addEventListener("submit", (e) => {

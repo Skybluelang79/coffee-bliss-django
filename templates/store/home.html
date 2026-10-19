@@ -29,21 +29,6 @@
         <div class="stat"><b>2M+</b><span>Cups poured</span></div>
       </div>
     </div>
-
-    <div class="hero-visual">
-      <div class="hero-card-3d">
-        {% if hero_image %}
-          <img src="{{ hero_image }}" alt="Coffee Bliss signature cup" />
-        {% else %}
-          <div class="hero-placeholder" style="aspect-ratio:4/3.4;border-radius:20px;background:radial-gradient(circle at 50% 30%, #3a2418, #150d09);display:grid;place-items:center;">
-            <span style="font-size:5rem;filter:drop-shadow(0 20px 30px rgba(0,0,0,.5))">☕</span>
-          </div>
-        {% endif %}
-        <div class="float-chip chip-1">🔥 Freshly roasted</div>
-        <div class="float-chip chip-2">★ 4.9 from {{ stats.reviews }} reviews</div>
-        <div class="float-chip chip-3">🚚 Free delivery over ${{ free_delivery_threshold|floatformat:0 }}</div>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -154,7 +139,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>window.heroImage = "{% if hero_image %}{{ hero_image }}{% endif %}";</script>
 <script src="{% static 'js/hero3d.js' %}" defer></script>
 <script src="{% static 'js/product3d.js' %}" defer></script>
 {% endblock %}

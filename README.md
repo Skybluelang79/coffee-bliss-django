@@ -93,16 +93,10 @@ Open <http://127.0.0.1:8000/> 🎉
 
 ---
 
-## 🖼️ Front-page image
+## 🖼️ Front-page hero
 
-The 3D hero card auto-loads a sample image if you place it at:
-
-```
-static/img/hero-sample.jpg
-```
-
-Otherwise an elegant built-in placeholder is shown. Drop your own image there and
-it appears automatically (recommended ~1200×1024 px).
+The hero is text-centred over the animated Three.js scene (rotating cup, steam,
+floating beans). No product image is rendered in the hero itself.
 
 ---
 
