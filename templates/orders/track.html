@@ -25,6 +25,12 @@
           {% if order.status == 'completed' %}
             <div class="track-eta-value">Ready ✓</div>
             <p class="small muted">Your order is complete. Enjoy!</p>
+          {% elif order.status == 'ready' %}
+            <div class="track-eta-value">Ready ✓</div>
+            <p class="small muted">Your order is ready — swing by the counter when you can.</p>
+          {% elif order.status == 'out_for_delivery' %}
+            <div class="track-eta-value">On its way 🛵</div>
+            <p class="small muted">Your courier is heading your way.</p>
           {% elif order.status == 'cancelled' or order.status == 'refunded' %}
             <div class="track-eta-value">—</div>
             <p class="small muted">This order was {{ order.get_status_display|lower }}.</p>
@@ -133,6 +139,9 @@
     <div class="card panel mt-3">
       <h3>Manage</h3>
       <div class="flex gap wrap mt-2">
+        {% if order.payment_status == 'unpaid' and order.is_open %}
+          <a class="btn" href="{% url 'orders:payment' order.number %}">Complete payment</a>
+        {% endif %}
         {% if order.can_cancel %}
           <form method="post" action="{% url 'orders:cancel' order.number %}" onsubmit="return confirm('Cancel order {{ order.number }}?')">
             {% csrf_token %}

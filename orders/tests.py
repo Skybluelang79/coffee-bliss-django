@@ -1,5 +1,6 @@
 from decimal import Decimal
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.core import mail
 from django.core.management import call_command
@@ -114,6 +115,13 @@ class GiftCardTests(TestCase):
             },
         )
 
+    def _pay(self):
+        """Complete the demo-gateway payment step for the only order."""
+        order = Order.objects.get()
+        self.client.post(reverse("orders:payment_simulate", args=[order.number]))
+        order.refresh_from_db()
+        return order
+
     def test_code_generated(self):
         card = GiftCard.objects.create(initial_balance=Decimal("10.00"), balance=Decimal("10.00"))
         self.assertTrue(card.code.startswith("CB-"))
@@ -138,7 +146,7 @@ class GiftCardTests(TestCase):
         self.client.post(reverse("orders:apply_gift_card"), {"code": card.code})
         self._checkout()
 
-        order = Order.objects.get()
+        order = self._pay()
         self.assertEqual(order.gift_card, card)
         self.assertEqual(order.gift_card_amount, Decimal("5.00"))
         self.assertEqual(order.total, Decimal("16.50"))
@@ -170,6 +178,7 @@ class GiftCardTests(TestCase):
         self._add_to_cart(quantity=2)
         self.client.post(reverse("orders:apply_gift_card"), {"code": card.code})
         self._checkout()
+        self._pay()
         order = Order.objects.get()
 
         ok, error = payments.refund_order(order)
@@ -188,6 +197,7 @@ class GiftCardTests(TestCase):
         self._add_to_cart(quantity=2)  # total after gift card = 21.50 - 5.00 = 16.50
         self.client.post(reverse("orders:apply_gift_card"), {"code": card.code})
         self._checkout()
+        self._pay()
         order = Order.objects.get()
 
         ok, error = payments.refund_order(order, amount=Decimal("8.25"))  # half of 16.50
@@ -310,11 +320,42 @@ class PaymentFlowTests(TestCase):
         response = self._place_order("card")
         self.assertEqual(response.status_code, 302)
         order = Order.objects.get()
+        # Card checkout stops at the payment step (demo gateway in dev).
+        self.assertEqual(response.url, reverse("orders:payment", args=[order.number]))
+        self.assertEqual(order.payment_status, Order.PaymentStatus.UNPAID)
+
+        page = self.client.get(response.url)
+        self.assertContains(page, "Demo payment gateway")
+
+        self.client.post(reverse("orders:payment_simulate", args=[order.number]))
+        order.refresh_from_db()
         self.assertEqual(order.payment_status, Order.PaymentStatus.PAID)
         self.assertEqual(order.status, Order.Status.CONFIRMED)
         # inventory consumed via recipe
         self.beans.refresh_from_db()
         self.assertEqual(self.beans.stock, Decimal("960"))
+
+    def test_payment_page_falls_back_when_provider_fails(self):
+        self._place_order("card")
+        order = Order.objects.get()
+        fake_intent = {
+            "client_secret": "secret",
+            "payment_intent_id": "pi_broken",
+            "simulated": False,
+        }
+        with self.settings(
+            STRIPE_SECRET_KEY="sk_test_bad",
+            STRIPE_PUBLISHABLE_KEY="pk_test_bad",
+        ):
+            with patch(
+                "orders.views.payments.is_configured", return_value=True
+            ), patch(
+                "orders.views.payments.create_payment_intent",
+                side_effect=[Exception("provider down"), fake_intent],
+            ):
+                page = self.client.get(reverse("orders:payment", args=[order.number]))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "demo gateway")
 
     def test_cash_checkout_marks_paid(self):
         self._place_order("cash")
@@ -326,6 +367,8 @@ class PaymentFlowTests(TestCase):
 
         self._place_order("card")
         order = Order.objects.get()
+        self.client.post(reverse("orders:payment_simulate", args=[order.number]))
+        order.refresh_from_db()
         ok, error = payments.refund_order(order)
         self.assertTrue(ok, error)
         order.refresh_from_db()

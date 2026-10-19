@@ -173,13 +173,9 @@ def checkout(request):
                 messages.success(request, f"Order {order.number} placed! Pay on {order.get_fulfillment_display().lower()}.")
                 return redirect("orders:order_confirmation", number=order.number)
 
-            if payments.is_configured():
-                return redirect("orders:payment", number=order.number)
-
-            # Simulated card gateway (no Stripe keys configured).
-            payments.simulate_success(order, user=request.user if request.user.is_authenticated else None)
-            messages.success(request, f"Order {order.number} placed! We're on it. ☕")
-            return redirect("orders:order_confirmation", number=order.number)
+            # Card: always take the payment step (the demo gateway renders
+            # automatically when no Stripe keys are configured).
+            return redirect("orders:payment", number=order.number)
         messages.error(request, "Please fix the highlighted fields.")
     else:
         form = CheckoutForm(initial=initial)
@@ -275,7 +271,25 @@ def payment_page(request, number):
     order = get_object_or_404(Order.objects.prefetch_related("items"), number=number)
     if order.payment_status == Order.PaymentStatus.PAID:
         return redirect("orders:order_confirmation", number=order.number)
-    intent = payments.create_payment_intent(order)
+
+    provider_error = ""
+    intent = None
+    use_stripe = payments.is_configured() and bool(settings.STRIPE_PUBLISHABLE_KEY)
+    if use_stripe:
+        try:
+            intent = payments.create_payment_intent(order)
+        except Exception as exc:  # bad keys, unsupported currency, network…
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Payment intent failed for %s: %s", order.number, exc
+            )
+            provider_error = (
+                "We couldn't reach the payment provider, so the demo gateway "
+                "below is ready to use — no real money moves in demo mode."
+            )
+    if intent is None:
+        intent = payments.create_payment_intent(order, force_simulated=True)
     return render(
         request,
         "orders/payment.html",
@@ -285,6 +299,7 @@ def payment_page(request, number):
             "payment_intent_id": intent["payment_intent_id"],
             "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
             "simulated": intent["simulated"],
+            "provider_error": provider_error,
             "currency": settings.CURRENCY_SYMBOL,
         },
     )

@@ -94,6 +94,19 @@ class AccountTests(TestCase):
         )
         self.assertRedirects(response, reverse("accounts:dashboard"))
 
+    def test_logout_get_is_not_allowed(self):
+        User.objects.create_user(email="bye@example.com", password="testpass123")
+        self.client.login(email="bye@example.com", password="testpass123")
+        response = self.client.get(reverse("accounts:logout"))
+        self.assertEqual(response.status_code, 405)
+
+    def test_logout_post_signs_out_and_redirects_home(self):
+        User.objects.create_user(email="bye@example.com", password="testpass123")
+        self.client.login(email="bye@example.com", password="testpass123")
+        response = self.client.post(reverse("accounts:logout"))
+        self.assertRedirects(response, reverse("store:home"))
+        self.assertIsNone(self.client.session.get("_auth_user_id"))
+
     def test_dashboard_requires_login(self):
         response = self.client.get(reverse("accounts:dashboard"))
         self.assertEqual(response.status_code, 302)

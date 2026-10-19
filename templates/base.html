@@ -72,7 +72,10 @@
             {% else %}
               <a href="{% url 'accounts:dashboard' %}" class="nav-mobile-link">My account</a>
             {% endif %}
-            <a href="{% url 'accounts:logout' %}" class="btn btn-block">Sign out</a>
+            <form method="post" action="{% url 'accounts:logout' %}">
+              {% csrf_token %}
+              <button class="btn btn-block" type="submit">Sign out</button>
+            </form>
           {% else %}
             <a href="{% url 'accounts:login' %}" class="btn btn-ghost btn-block">Sign in</a>
             <a href="{% url 'accounts:signup' %}" class="btn btn-block">Join free — get 100 beans</a>
@@ -103,7 +106,10 @@
             {% else %}
               <a href="{% url 'accounts:dashboard' %}" class="btn btn-ghost btn-sm">{{ user.get_short_name }}</a>
             {% endif %}
-            <a href="{% url 'accounts:logout' %}" class="btn btn-sm">Sign out</a>
+            <form method="post" action="{% url 'accounts:logout' %}">
+              {% csrf_token %}
+              <button class="btn btn-sm" type="submit">Sign out</button>
+            </form>
           {% else %}
             <a href="{% url 'accounts:login' %}" class="btn btn-ghost btn-sm">Sign in</a>
             <a href="{% url 'accounts:signup' %}" class="btn btn-sm">Join free</a>

@@ -540,6 +540,8 @@ table.data tr:hover td { background: rgba(200,150,62,.04); }
 .dash-nav a { padding: .7rem 1rem; border-radius: var(--radius-sm); color: var(--muted); font-size: .92rem; transition: .2s; display: flex; align-items: center; gap: .6rem; }
 .dash-nav a:hover { background: var(--soft-bg-2); color: var(--text); }
 .dash-nav a.active { background: linear-gradient(135deg, rgba(200,150,62,.22), rgba(138,90,43,.12)); color: var(--text); border-left: 3px solid var(--brand); }
+.dash-nav-link-btn { padding: .7rem 1rem; border-radius: var(--radius-sm); color: var(--muted); font-size: .92rem; transition: .2s; display: flex; align-items: center; gap: .6rem; background: none; border: 0; width: 100%; cursor: pointer; font-family: inherit; text-align: left; }
+.dash-nav-link-btn:hover { background: var(--soft-bg-2); color: var(--text); }
 .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.2rem; }
 .metric { padding: 1.3rem 1.4rem; }
 .metric .label { font-size: .74rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }

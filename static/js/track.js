@@ -33,11 +33,11 @@
   var ticker = null;
   function startCountdown() {
     if (!countdown) return;
-    if (ticker) clearInterval(ticker);
+    stopCountdown();
     function render() {
       if (eta <= 0) {
         countdown.textContent = "Any moment now";
-        if (ticker) { clearInterval(ticker); ticker = null; }
+        stopCountdown();
         return;
       }
       countdown.textContent = formatEta(eta);
@@ -46,7 +46,21 @@
     render();
     ticker = setInterval(render, 1000);
   }
-  if (eta > 0) startCountdown();
+  function stopCountdown() {
+    if (ticker) { clearInterval(ticker); ticker = null; }
+  }
+
+  var ETA_TEXT = {
+    ready: "Ready ✓",
+    out_for_delivery: "On its way 🛵",
+    completed: "Done ✓"
+  };
+
+  if (countdown && ETA_TEXT[initialStatus] !== undefined) {
+    countdown.textContent = ETA_TEXT[initialStatus];
+  } else {
+    startCountdown();
+  }
 
   /* ---- Route map ------------------------------------------------------- */
   var track = document.getElementById("route-track");
@@ -87,9 +101,22 @@
     if (progress) progress.style.width = data.progress + "%";
     setMapProgress(data.progress);
     renderTimeline(data.steps);
-    if (etaBlock && data.eta_seconds !== null && data.eta_seconds !== undefined) {
+
+    if (countdown && ETA_TEXT[data.status] !== undefined) {
+      stopCountdown();
+      countdown.textContent = ETA_TEXT[data.status];
+    } else if (etaBlock && data.eta_seconds !== null && data.eta_seconds !== undefined) {
       eta = data.eta_seconds;
       startCountdown();
+    }
+
+    var readyEl = root.querySelector("[data-ready-time]");
+    if (readyEl && data.estimated_ready_at) {
+      var d = new Date(data.estimated_ready_at);
+      var hr = d.getHours(), min = d.getMinutes();
+      var ampm = hr >= 12 ? "PM" : "AM";
+      hr = hr % 12 || 12;
+      readyEl.textContent = hr + ":" + (min < 10 ? "0" : "") + min + " " + ampm;
     }
 
     var changed = data.status !== initialStatus;
@@ -110,6 +137,7 @@
   }
 
   if (initialStatus && TERMINAL.indexOf(initialStatus) === -1) {
+    setTimeout(poll, 3000);
     setInterval(poll, 12000);
     document.addEventListener("visibilitychange", function () {
       if (!document.hidden) poll();

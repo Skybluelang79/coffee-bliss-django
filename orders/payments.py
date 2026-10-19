@@ -45,14 +45,14 @@ def get_or_create_payment(order: Order, method: str = Payment.Method.CARD) -> Pa
     return payment
 
 
-def create_payment_intent(order: Order, payment: Payment | None = None):
+def create_payment_intent(order: Order, payment: Payment | None = None, force_simulated: bool = False):
     """Create (or reuse) a Stripe PaymentIntent for an order.
 
     Returns a dict: {"client_secret": str, "payment_intent_id": str, "simulated": bool}
     """
     payment = payment or get_or_create_payment(order)
 
-    if not is_configured():
+    if force_simulated or not is_configured():
         # Simulated mode — no external calls.
         payment.reference = payment.reference or f"SIM-{order.number}"
         payment.state = Payment.State.PENDING

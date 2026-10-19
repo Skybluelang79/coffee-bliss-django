@@ -14,6 +14,7 @@
     <p class="muted">Order <strong class="gradient-text">{{ order.number }}</strong> · total {{ currency }}{{ order.total|floatformat:2 }}</p>
 
     <div class="card panel mt-3">
+      {% if provider_error %}<div class="message warning mb-2">{{ provider_error }}</div>{% endif %}
       {% if simulated %}
         <h3>Demo payment gateway</h3>
         <p class="small">Stripe keys are not configured, so this is a simulated card payment. No real money moves.</p>
@@ -27,7 +28,7 @@
         <div id="payment-message" class="small mt-2"></div>
         <p class="form-hint mt-1">Test card: 4242 4242 4242 4242 · any future date · any CVC.</p>
       {% endif %}
-      <a href="{% url 'orders:cart' %}" class="btn btn-ghost btn-block mt-2">Cancel and return to cart</a>
+      <a href="{% url 'orders:track' order.number %}" class="btn btn-ghost btn-block mt-2">Pay later — back to my order</a>
     </div>
   </div>
 </section>

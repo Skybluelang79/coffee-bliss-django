@@ -11,7 +11,10 @@
       <a href="{% url 'accounts:addresses' %}">📍 Addresses</a>
       <a href="{% url 'store:menu' %}">☕ Order again</a>
       <a href="{% url 'accounts:password_change' %}">🔒 Password</a>
-      <a href="{% url 'accounts:logout' %}">↩ Sign out</a>
+      <form method="post" action="{% url 'accounts:logout' %}">
+        {% csrf_token %}
+        <button class="dash-nav-link-btn" type="submit">↩ Sign out</button>
+      </form>
     </aside>
 
     <div>
