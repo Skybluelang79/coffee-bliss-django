@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Orders for {{ email }} — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="block" style="padding-top:2.5rem">
+  <div class="container" style="max-width:760px">
+    <span class="eyebrow">Order tracking</span>
+    <h1>Orders for {{ email }}</h1>
+
+    {% if orders %}
+      <div class="card panel mt-3">
+        {% for order in orders %}
+          <a class="order-row" href="{% url 'orders:track' order.number %}">
+            <div>
+              <strong>{{ order.number }}</strong>
+              <p class="small muted">{{ order.placed_at|date:"M j, Y · g:i A" }} · {{ order.item_count }} item{{ order.item_count|pluralize }}</p>
+            </div>
+            <div class="flex center gap">
+              <span>{{ currency_symbol }}{{ order.total|floatformat:2 }}</span>
+              <span class="status {{ order.status_color }}">{{ order.get_status_display }}</span>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="card panel mt-3">
+        <p>No orders found for <strong>{{ email }}</strong>.</p>
+        <p class="small muted">Double-check the email, or try searching by order number.</p>
+      </div>
+    {% endif %}
+
+    <p class="small muted mt-2"><a href="{% url 'orders:track_lookup' %}">← Search again</a></p>
+  </div>
+</section>
+{% endblock %}

@@ -50,7 +50,7 @@
     </form>
 
     <div class="auth-foot mt-3">
-      <p class="small" style="margin:0">New here? <a href="{% url 'accounts:signup' %}" class="gradient-text">Create a free account</a></p>
+      <p class="small" style="margin:0">New here? <a href="{% url 'accounts:signup' %}{% if next %}?next={{ next|urlencode }}{% endif %}" class="gradient-text">Create a free account</a></p>
       <a href="{% url 'orders:track_lookup' %}" class="small link-quiet">Track a guest order →</a>
     </div>
   </div>

@@ -13,6 +13,7 @@ from django.contrib.auth.views import (
 from django.db import IntegrityError, transaction
 from django.shortcuts import redirect, render, get_object_or_404
 from django.urls import reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from orders.models import Order
@@ -46,6 +47,11 @@ class CoffeeLoginView(LoginView):
 def signup_view(request):
     if request.user.is_authenticated:
         return redirect("accounts:dashboard")
+    next_url = request.POST.get("next") or request.GET.get("next") or ""
+    if next_url and not url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        next_url = ""
     if request.method == "POST":
         form = SignUpForm(request.POST)
         if form.is_valid():
@@ -67,11 +73,11 @@ def signup_view(request):
                     request,
                     f"Welcome to Coffee Bliss! You've earned {user.loyalty_points} loyalty beans.",
                 )
-                return redirect("accounts:dashboard")
+                return redirect(next_url or "accounts:dashboard")
         messages.error(request, "Please fix the errors below.")
     else:
         form = SignUpForm()
-    return render(request, "accounts/signup.html", {"form": form})
+    return render(request, "accounts/signup.html", {"form": form, "next": next_url})
 
 
 @require_POST

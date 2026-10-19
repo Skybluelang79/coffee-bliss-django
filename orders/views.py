@@ -1,19 +1,24 @@
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from . import payments
 from .cart import Cart
-from .forms import CartEmailForm, CheckoutForm, ReservationForm
+from .forms import CartEmailForm, CheckoutForm, OrderFeedbackForm, ReservationForm
 from .models import (
     GiftCard,
     GiftCardTransaction,
     Order,
     OrderItem,
     OrderStatusHistory,
+    Payment,
     Reservation,
 )
 
@@ -129,6 +134,7 @@ def capture_cart_email(request):
     return redirect("orders:cart")
 
 
+@login_required
 def checkout(request):
     cart = Cart(request)
     if not len(cart):
@@ -185,7 +191,7 @@ def _create_order(request, cart, form):
     data = form.cleaned_data
     order = Order(
         user=request.user if request.user.is_authenticated else None,
-        guest_email="" if request.user.is_authenticated else request.POST.get("guest_email", ""),
+        guest_email="",
         fulfillment=data["fulfillment"],
         location=data.get("location"),
         customer_name=data["customer_name"],
@@ -216,6 +222,8 @@ def _create_order(request, cart, form):
         )
     order = order.recalculate()
     order.save()
+    order.notify_email = True
+    order.ensure_estimated_ready_at()
 
     # Redeem the gift card now that the order total is known.
     if order.gift_card_id and order.gift_card_amount:
@@ -309,17 +317,266 @@ def order_confirmation(request, number):
 
 def track_order(request, number):
     order = get_object_or_404(
-        Order.objects.prefetch_related("items", "history"), number=number
+        Order.objects.prefetch_related("items", "history").select_related(
+            "location", "user"
+        ),
+        number=number,
     )
-    return render(request, "orders/track.html", {"order": order})
+    if order.estimated_ready_at is None:
+        order.ensure_estimated_ready_at()
+    is_owner = request.user.is_authenticated and (
+        order.user_id == request.user.id or request.user.is_staff_member
+    )
+    return render(
+        request,
+        "orders/track.html",
+        {
+            "order": order,
+            "steps": order.timeline(),
+            "eta_seconds": order.eta_seconds_left,
+            "is_owner": is_owner,
+            "rating_choices": [5, 4, 3, 2, 1],
+        },
+    )
+
+
+def track_status(request, number):
+    """JSON snapshot used by the live-updating tracking page."""
+    order = get_object_or_404(Order.objects.prefetch_related("items"), number=number)
+    return JsonResponse(
+        {
+            "number": order.number,
+            "status": order.status,
+            "status_display": order.get_status_display(),
+            "status_color": order.status_color,
+            "updated_at": order.updated_at.isoformat(),
+            "eta_seconds": order.eta_seconds_left,
+            "eta_minutes": order.eta_minutes,
+            "estimated_ready_at": order.estimated_ready_at.isoformat()
+            if order.estimated_ready_at
+            else None,
+            "ready_at": order.ready_at.isoformat() if order.ready_at else None,
+            "progress": order.progress_percent,
+            "is_late": order.is_late,
+            "is_open": order.is_open,
+            "steps": order.timeline(),
+            "can_cancel": order.can_cancel,
+            "can_rate": order.can_rate,
+            "courier": {
+                "name": order.courier_name,
+                "phone": order.courier_phone,
+                "vehicle": order.courier_vehicle,
+                "live": order.courier_is_live,
+                "lat": float(order.courier_lat) if order.courier_lat is not None else None,
+                "lng": float(order.courier_lng) if order.courier_lng is not None else None,
+            },
+        }
+    )
 
 
 def track_lookup(request):
-    number = request.GET.get("number", "").strip().upper()
-    if number:
-        return redirect("orders:track", number=number)
-    messages.info(request, "Enter an order number to track it.")
-    return redirect("store:home")
+    """Look up a single order number, or list every order for an email."""
+    query = (request.GET.get("number") or request.GET.get("q") or "").strip()
+    if query:
+        if "@" in query:
+            orders = (
+                Order.objects.filter(
+                    Q(guest_email__iexact=query) | Q(user__email__iexact=query)
+                )
+                .select_related("user")
+                .prefetch_related("items")
+                .order_by("-created_at")
+            )
+            return render(
+                request,
+                "orders/track_results.html",
+                {"query": query, "email": query, "orders": orders},
+            )
+        return redirect("orders:track", number=query.upper())
+    return render(request, "orders/track_lookup.html")
+
+
+def _get_owned_order(request, number):
+    """Fetch an order the current user owns (staff may access any order)."""
+    order = get_object_or_404(Order.objects.select_related("user"), number=number)
+    if not (
+        request.user.is_authenticated
+        and (order.user_id == request.user.id or request.user.is_staff_member)
+    ):
+        raise Http404("Order not found")
+    return order
+
+
+@login_required
+@require_POST
+def cancel_order(request, number):
+    order = _get_owned_order(request, number)
+    if not order.can_cancel:
+        messages.error(
+            request,
+            "This order can no longer be cancelled online — our team is already on it.",
+        )
+        return redirect("orders:track", number=order.number)
+
+    user = request.user
+    if order.payment_status == Order.PaymentStatus.PAID:
+        ok, error = payments.refund_order(order, user=user)
+        if ok:
+            messages.success(
+                request, f"Order {order.number} cancelled — your refund is on the way."
+            )
+        else:
+            messages.error(
+                request,
+                "We couldn't process the refund automatically. Our team will follow up.",
+            )
+        return redirect("orders:track", number=order.number)
+
+    # Unpaid order: cancel outright, returning any reserved stock/balance.
+    from inventory.services import restore_for_order
+
+    restore_for_order(order, user=user)
+    if order.gift_card_id and order.gift_card_amount:
+        credited = order.gift_card.credit(order.gift_card_amount)
+        GiftCardTransaction.objects.create(
+            gift_card=order.gift_card,
+            order=order,
+            kind=GiftCardTransaction.Kind.REFUND,
+            amount=credited,
+            balance_after=order.gift_card.balance,
+            note=f"Cancelled order {order.number}",
+        )
+    order.status = Order.Status.CANCELLED
+    order.save(update_fields=["status", "updated_at"])
+    OrderStatusHistory.objects.create(
+        order=order,
+        status=Order.Status.CANCELLED,
+        changed_by=user,
+        note="Cancelled by customer",
+    )
+    messages.success(request, f"Order {order.number} has been cancelled.")
+    return redirect("orders:track", number=order.number)
+
+
+@login_required
+@require_POST
+def reorder(request, number):
+    order = _get_owned_order(request, number)
+    cart = Cart(request)
+    cart.clear()
+    added = 0
+    unavailable = []
+    for item in order.items.select_related("product"):
+        product = item.product
+        if product and product.is_active and product.in_stock:
+            cart.add(product, quantity=item.quantity, options=item.options or {})
+            added += 1
+        else:
+            unavailable.append(item.name)
+    if added:
+        messages.success(
+            request, f"Added {added} item{'' if added == 1 else 's'} from {order.number} to your cart."
+        )
+    if unavailable:
+        messages.info(request, "Not available right now: " + ", ".join(unavailable))
+    if not added:
+        messages.error(request, "None of those items are available at the moment.")
+        return redirect("orders:track", number=order.number)
+    return redirect("orders:cart")
+
+
+@login_required
+def receipt(request, number):
+    order = _get_owned_order(request, number)
+    return render(
+        request,
+        "orders/receipt.html",
+        {"order": order, "items": order.items.all()},
+    )
+
+
+@login_required
+@require_POST
+def rate_order(request, number):
+    order = _get_owned_order(request, number)
+    if order.status != Order.Status.COMPLETED and not request.user.is_staff_member:
+        messages.error(request, "You can leave a rating once this order is complete.")
+        return redirect("orders:track", number=order.number)
+
+    form = OrderFeedbackForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Please pick a rating from 1 to 5 stars.")
+        return redirect("orders:track", number=order.number)
+
+    order.rating = form.cleaned_data["rating"]
+    order.feedback = form.cleaned_data["feedback"]
+    order.rated_at = timezone.now()
+    tip = form.cleaned_data.get("tip") or 0
+    fields = ["rating", "feedback", "rated_at", "updated_at"]
+
+    if tip:
+        order.tip = (order.tip or 0) + tip
+        order.total = order.total + tip
+        fields += ["tip", "total"]
+    order.save(update_fields=fields)
+
+    if tip:
+        if order.payment_status == Order.PaymentStatus.PAID:
+            Payment.objects.create(
+                order=order,
+                method=Payment.Method.CARD,
+                amount=tip,
+                state=Payment.State.SUCCEEDED,
+                is_successful=True,
+                reference=f"TIP-{order.number}",
+            )
+        else:
+            order.payments.filter(state=Payment.State.PENDING).update(amount=order.total)
+        OrderStatusHistory.objects.create(
+            order=order,
+            status=order.status,
+            changed_by=request.user,
+            note=f"Tip of {settings.CURRENCY_SYMBOL}{tip} added",
+        )
+
+    messages.success(
+        request,
+        "Thanks for the feedback — it means a lot!"
+        + (f" Your {settings.CURRENCY_SYMBOL}{tip} tip is truly appreciated." if tip else ""),
+    )
+    return redirect("orders:track", number=order.number)
+
+
+@login_required
+@require_POST
+def toggle_notifications(request, number):
+    order = _get_owned_order(request, number)
+    order.notify_email = not order.notify_email
+    order.save(update_fields=["notify_email", "updated_at"])
+    messages.info(
+        request,
+        "Status emails turned on."
+        if order.notify_email
+        else "Status emails turned off for this order.",
+    )
+    return redirect("orders:track", number=order.number)
+
+
+def notify_pref(request):
+    """One-click unsubscribe from order status emails (signed token)."""
+    order = Order.from_notification_token(request.GET.get("token", ""))
+    if order is None:
+        messages.error(request, "That link is invalid or has expired.")
+        return redirect("store:home")
+    order.notify_email = "off" not in request.GET
+    order.save(update_fields=["notify_email", "updated_at"])
+    messages.info(
+        request,
+        f"Status emails for order {order.number} are now "
+        + ("on." if order.notify_email else "off."),
+    )
+    return redirect("orders:track", number=order.number)
+
 
 
 def reserve(request):

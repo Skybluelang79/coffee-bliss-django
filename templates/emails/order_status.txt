@@ -1,0 +1,16 @@
+Hi {{ first_name }},
+
+Your Coffee Bliss order {{ order.number }} has an update.
+
+Status: {{ status_display }}
+{{ message }}
+
+What's in your order:
+{% for item in order.items.all %}  {{ item.quantity }} × {{ item.name }}
+{% endfor %}  Total: {{ currency_symbol }}{{ order.total }}
+
+Track it live: {{ track_url }}
+
+Thanks for choosing {{ site_name }}.
+--
+Don't want status emails for this order? Unsubscribe: {{ unsubscribe_url }}

@@ -190,6 +190,14 @@ EMAIL_BACKEND = env(
 )
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="hello@coffeebliss.test")
 
+# Order status notifications. Set SMS_BACKEND to "module.callable" to enable
+# text messages (the callable receives ``phone`` and ``message``).
+ORDER_NOTIFICATIONS_ENABLED = env.bool("ORDER_NOTIFICATIONS_ENABLED", default=True)
+SMS_BACKEND = env("SMS_BACKEND", default="")
+
+# Rough delivery buffer (minutes) added to the ETA for delivery orders.
+DELIVERY_ETA_BUFFER = env.int("DELIVERY_ETA_BUFFER", default=15)
+
 # Absolute base URL used when building links in outbound emails.
 SITE_URL = env("SITE_URL", default=RENDER_EXTERNAL_URL or "http://127.0.0.1:8000")
 

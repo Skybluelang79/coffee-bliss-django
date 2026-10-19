@@ -1,9 +1,10 @@
 from decimal import Decimal
+from datetime import timedelta
 import secrets
 import string
 
 from django.conf import settings
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -88,6 +89,38 @@ class Order(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(blank=True, null=True)
     stock_consumed = models.BooleanField(default=False)
+
+    # ---- Tracking -------------------------------------------------------
+    estimated_ready_at = models.DateTimeField(
+        blank=True, null=True, help_text="When the order should be ready."
+    )
+    ready_at = models.DateTimeField(blank=True, null=True)
+
+    # ---- Courier (delivery orders) --------------------------------------
+    courier_name = models.CharField(max_length=120, blank=True)
+    courier_phone = models.CharField(max_length=40, blank=True)
+    courier_vehicle = models.CharField(
+        max_length=80, blank=True, help_text="e.g. Scooter · CB-402"
+    )
+    courier_lat = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    courier_lng = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    courier_updated_at = models.DateTimeField(blank=True, null=True)
+
+    # ---- Post-order feedback --------------------------------------------
+    rating = models.PositiveSmallIntegerField(
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+    )
+    feedback = models.TextField(blank=True)
+    tip = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    rated_at = models.DateTimeField(blank=True, null=True)
+
+    # ---- Notifications ---------------------------------------------------
+    notify_email = models.BooleanField(
+        default=True, help_text="Email the customer as the order progresses."
+    )
+    sms_opt_in = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["-created_at"]
@@ -182,6 +215,154 @@ class Order(models.Model):
             "refunded": "gray",
         }.get(self.status, "gray")
 
+    # ---- Tracking helpers ------------------------------------------------
+    TRACK_STEPS = [
+        ("received", "Order received"),
+        ("confirmed", "Confirmed"),
+        ("preparing", "Preparing"),
+        ("ready", "Ready"),
+        ("completed", "Completed"),
+    ]
+
+    # Statuses that mark each timeline step as reached.
+    _STEP_REACHED = {
+        "received": {
+            "pending", "confirmed", "preparing", "ready", "out_for_delivery", "completed",
+        },
+        "confirmed": {
+            "confirmed", "preparing", "ready", "out_for_delivery", "completed",
+        },
+        "preparing": {"preparing", "ready", "out_for_delivery", "completed"},
+        "ready": {"ready", "out_for_delivery", "completed"},
+        "completed": {"completed"},
+    }
+
+    @property
+    def recipient_email(self):
+        if self.user_id and self.user:
+            return self.user.email
+        return self.guest_email
+
+    @property
+    def prep_minutes(self):
+        """Longest prep time across the items (fallback 5 min)."""
+        values = [
+            item.product.prep_time_minutes
+            for item in self.items.all()
+            if item.product is not None and item.product.prep_time_minutes
+        ]
+        return max(values) if values else 5
+
+    @property
+    def eta_minutes(self):
+        """Total estimated wait, including a delivery buffer."""
+        minutes = self.prep_minutes
+        if self.fulfillment == self.Fulfillment.DELIVERY:
+            minutes += getattr(settings, "DELIVERY_ETA_BUFFER", 15)
+        return minutes
+
+    def ensure_estimated_ready_at(self, save=True):
+        if self.estimated_ready_at is None and self.placed_at:
+            self.estimated_ready_at = self.placed_at + timedelta(
+                minutes=self.eta_minutes
+            )
+            if save:
+                super(Order, self).save(
+                    update_fields=["estimated_ready_at", "updated_at"]
+                )
+        return self.estimated_ready_at
+
+    @property
+    def eta_seconds_left(self):
+        """Seconds until the estimated ready time (0 once passed/closed)."""
+        if self.status in {
+            self.Status.COMPLETED,
+            self.Status.CANCELLED,
+            self.Status.REFUNDED,
+        }:
+            return 0
+        if not self.estimated_ready_at:
+            return 0
+        remaining = (self.estimated_ready_at - timezone.now()).total_seconds()
+        return max(0, int(remaining))
+
+    @property
+    def is_late(self):
+        return bool(self.is_open and self.eta_seconds_left == 0)
+
+    @property
+    def progress_percent(self):
+        """Rough 0-100 progress used by the tracking bar/map."""
+        mapping = {
+            self.Status.PENDING: 8,
+            self.Status.CONFIRMED: 30,
+            self.Status.PREPARING: 55,
+            self.Status.READY: 80,
+            self.Status.OUT_FOR_DELIVERY: 88,
+            self.Status.COMPLETED: 100,
+        }
+        if self.status in {self.Status.CANCELLED, self.Status.REFUNDED}:
+            return 100
+        return mapping.get(self.status, 10)
+
+    def timeline(self):
+        """Ordered steps with ``done`` / ``current`` flags for the template."""
+        order = [key for key, _ in self.TRACK_STEPS]
+        labels = dict(self.TRACK_STEPS)
+        try:
+            index = order.index(self.status) if self.status in order else -1
+        except ValueError:
+            index = -1
+        # out_for_delivery sits between ready and completed.
+        reached = {
+            key for key in order if self.status in self._STEP_REACHED[key]
+        }
+        steps = []
+        for position, key in enumerate(order):
+            steps.append(
+                {
+                    "key": key,
+                    "label": labels[key],
+                    "done": key in reached,
+                    "current": position == index,
+                }
+            )
+        return steps
+
+    @property
+    def can_cancel(self):
+        return self.status in {self.Status.PENDING, self.Status.CONFIRMED}
+
+    @property
+    def can_reorder(self):
+        return self.items.filter(product__isnull=False).exists()
+
+    @property
+    def can_rate(self):
+        return self.status == self.Status.COMPLETED and self.rating is None
+
+    @property
+    def courier_is_live(self):
+        return bool(
+            self.courier_updated_at
+            and (timezone.now() - self.courier_updated_at).total_seconds() < 300
+        )
+
+    def notification_token(self):
+        from django.core import signing
+
+        return signing.dumps({"order": self.pk, "n": self.number})
+
+    @staticmethod
+    def from_notification_token(token, max_age=60 * 60 * 24 * 365):
+        from django.core import signing
+
+        try:
+            data = signing.loads(token, max_age=max_age)
+        except signing.BadSignature:
+            return None
+        return Order.objects.filter(pk=data.get("order"), number=data.get("n")).first()
+
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
@@ -202,6 +383,19 @@ class OrderItem(models.Model):
     @property
     def line_total(self):
         return self.unit_price * self.quantity
+
+    @property
+    def options_display(self):
+        """Human-readable options, e.g. ``Large · Oat milk · Extra shot``."""
+        if not self.options:
+            return ""
+        parts = []
+        for key, value in self.options.items():
+            if isinstance(value, (list, tuple)):
+                parts.extend(str(v) for v in value)
+            elif value:
+                parts.append(str(value))
+        return " · ".join(parts)
 
 
 class OrderStatusHistory(models.Model):

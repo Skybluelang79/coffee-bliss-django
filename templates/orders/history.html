@@ -26,7 +26,13 @@
                   <td><span class="status {{ order.status_color }}">{{ order.get_status_display }}</span></td>
                   <td class="flex gap-sm">
                     <a class="btn btn-ghost btn-sm" href="{% url 'orders:track' order.number %}">Track</a>
-                    <a class="btn btn-ghost btn-sm" href="{% url 'accounts:order_detail' order.number %}">Details</a>
+                    <a class="btn btn-ghost btn-sm" href="{% url 'orders:receipt' order.number %}">Receipt</a>
+                    {% if order.can_reorder %}
+                    <form method="post" action="{% url 'orders:reorder' order.number %}">
+                      {% csrf_token %}
+                      <button class="btn btn-ghost btn-sm" type="submit">Reorder</button>
+                    </form>
+                    {% endif %}
                   </td>
                 </tr>
               {% endfor %}

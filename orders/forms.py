@@ -135,3 +135,28 @@ class ReservationForm(forms.ModelForm):
         if size < 1:
             raise forms.ValidationError("Party size must be at least 1.")
         return size
+
+
+class OrderFeedbackForm(forms.Form):
+    rating = forms.IntegerField(min_value=1, max_value=5)
+    feedback = forms.CharField(
+        required=False,
+        max_length=2000,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-input",
+                "rows": 3,
+                "placeholder": "Tell us how it went (optional)",
+            }
+        ),
+    )
+    tip = forms.DecimalField(
+        required=False,
+        min_value=0,
+        max_digits=8,
+        decimal_places=2,
+        initial=0,
+    )
+
+    def clean_tip(self):
+        return self.cleaned_data.get("tip") or 0

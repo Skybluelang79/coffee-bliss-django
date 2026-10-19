@@ -14,6 +14,7 @@ from orders.models import (
     GiftCard,
     GiftCardTransaction,
     Order,
+    OrderItem,
     Payment,
 )
 from store.models import Category, Coupon, Product
@@ -73,6 +74,13 @@ class CartAndCheckoutTests(TestCase):
     def test_order_number_generated(self):
         order = Order.objects.create(customer_name="Walk In")
         self.assertTrue(order.number.startswith("CB"))
+
+    def test_checkout_requires_sign_in(self):
+        self.client.post(reverse("orders:cart_add", args=[self.product.id]), {"quantity": 1})
+        response = self.client.get(reverse("orders:checkout"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response.url)
+        self.assertIn("next", response.url)
 
 
 @FAST
@@ -394,6 +402,196 @@ class KitchenConsumerTests(TestCase):
         communicator = self._communicator(self.customer)
         connected, _ = await communicator.connect()
         self.assertFalse(connected)
+
+
+@FAST
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    STRIPE_SECRET_KEY="",
+    STRIPE_PUBLISHABLE_KEY="",
+)
+class TrackingTests(TestCase):
+    def setUp(self):
+        self.category = Category.objects.create(name="Coffee", icon="☕")
+        self.product = Product.objects.create(
+            name="Flat White",
+            category=self.category,
+            kind=Product.Kind.DRINK,
+            price=Decimal("4.50"),
+            prep_time_minutes=6,
+        )
+        self.user = User.objects.create_user(
+            email="tracker@example.com", password="trackpass123"
+        )
+        self.other = User.objects.create_user(
+            email="stranger@example.com", password="nope12345"
+        )
+
+    def _order(self, status=Order.Status.PENDING, paid=False, fulfillment="pickup"):
+        order = Order.objects.create(
+            user=self.user,
+            customer_name="Tracker",
+            customer_phone="5551234",
+            fulfillment=fulfillment,
+            notify_email=True,
+        )
+        OrderItem.objects.create(
+            order=order,
+            product=self.product,
+            name=self.product.name,
+            unit_price=self.product.price,
+            quantity=2,
+        )
+        order = order.recalculate()
+        order.save()
+        order.ensure_estimated_ready_at()
+        if paid:
+            order.payment_status = Order.PaymentStatus.PAID
+            order.save(update_fields=["payment_status"])
+            Payment.objects.create(
+                order=order,
+                method=Payment.Method.CARD,
+                amount=order.total,
+                state=Payment.State.SUCCEEDED,
+                is_successful=True,
+            )
+        if status != Order.Status.PENDING:
+            order.status = status
+            order.save(update_fields=["status", "updated_at"])
+        return order
+
+    def test_track_page_renders_with_eta(self):
+        order = self._order()
+        order.estimated_ready_at = None
+        order.save(update_fields=["estimated_ready_at"])
+        response = self.client.get(reverse("orders:track", args=[order.number]))
+        self.assertEqual(response.status_code, 200)
+        order.refresh_from_db()
+        self.assertIsNotNone(order.estimated_ready_at)
+        self.assertContains(response, order.number)
+
+    def test_status_endpoint_json(self):
+        order = self._order(status=Order.Status.PREPARING)
+        response = self.client.get(reverse("orders:track_status", args=[order.number]))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], Order.Status.PREPARING)
+        self.assertIn("steps", data)
+        self.assertEqual(len(data["steps"]), 5)
+        self.assertIn("courier", data)
+
+    def test_cancel_unpaid_order(self):
+        order = self._order()
+        self.client.login(email="tracker@example.com", password="trackpass123")
+        response = self.client.post(reverse("orders:cancel", args=[order.number]))
+        self.assertRedirects(response, reverse("orders:track", args=[order.number]))
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.Status.CANCELLED)
+
+    def test_cancel_requires_ownership(self):
+        order = self._order()
+        self.client.login(email="stranger@example.com", password="nope12345")
+        response = self.client.post(reverse("orders:cancel", args=[order.number]))
+        self.assertEqual(response.status_code, 404)
+        order.refresh_from_db()
+        self.assertNotEqual(order.status, Order.Status.CANCELLED)
+
+    def test_cancel_not_allowed_when_ready(self):
+        order = self._order(status=Order.Status.READY)
+        self.client.login(email="tracker@example.com", password="trackpass123")
+        self.client.post(reverse("orders:cancel", args=[order.number]))
+        order.refresh_from_db()
+        self.assertNotEqual(order.status, Order.Status.CANCELLED)
+
+    def test_cancel_paid_order_refunds(self):
+        order = self._order(paid=True)
+        self.client.login(email="tracker@example.com", password="trackpass123")
+        self.client.post(reverse("orders:cancel", args=[order.number]))
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, Order.PaymentStatus.REFUNDED)
+
+    def test_reorder_populates_cart(self):
+        order = self._order()
+        self.client.login(email="tracker@example.com", password="trackpass123")
+        response = self.client.post(reverse("orders:reorder", args=[order.number]))
+        self.assertRedirects(response, reverse("orders:cart"))
+        cart = self.client.session.get("coffee_cart")
+        self.assertIn(str(self.product.pk), cart)
+        self.assertEqual(cart[str(self.product.pk)]["quantity"], 2)
+
+    def test_receipt_owner_only(self):
+        order = self._order(status=Order.Status.COMPLETED)
+        url = reverse("orders:receipt", args=[order.number])
+        self.assertEqual(self.client.get(url).status_code, 302)  # anon → login
+        self.client.login(email="stranger@example.com", password="nope12345")
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.client.login(email="tracker@example.com", password="trackpass123")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, order.number)
+
+    def test_rate_and_tip_completed_order(self):
+        order = self._order(status=Order.Status.COMPLETED, paid=True)
+        total_before = order.total
+        self.client.login(email="tracker@example.com", password="trackpass123")
+        response = self.client.post(
+            reverse("orders:rate", args=[order.number]),
+            {"rating": 5, "feedback": "Delicious", "tip": "2.00"},
+        )
+        self.assertRedirects(response, reverse("orders:track", args=[order.number]))
+        order.refresh_from_db()
+        self.assertEqual(order.rating, 5)
+        self.assertEqual(order.feedback, "Delicious")
+        self.assertEqual(order.tip, Decimal("2.00"))
+        self.assertEqual(order.total, total_before + Decimal("2.00"))
+        self.assertTrue(
+            order.payments.filter(reference=f"TIP-{order.number}").exists()
+        )
+
+    def test_rate_rejected_before_completion(self):
+        order = self._order(status=Order.Status.PREPARING)
+        self.client.login(email="tracker@example.com", password="trackpass123")
+        self.client.post(reverse("orders:rate", args=[order.number]), {"rating": 4})
+        order.refresh_from_db()
+        self.assertIsNone(order.rating)
+
+    def test_notify_pref_unsubscribe_via_token(self):
+        order = self._order()
+        token = order.notification_token()
+        response = self.client.get(reverse("orders:notify_pref"), {"token": token, "off": "1"})
+        self.assertRedirects(response, reverse("orders:track", args=[order.number]))
+        order.refresh_from_db()
+        self.assertFalse(order.notify_email)
+
+    def test_status_change_sends_email(self):
+        order = self._order()
+        with self.captureOnCommitCallbacks(execute=True):
+            order.status = Order.Status.CONFIRMED
+            order.save(update_fields=["status", "updated_at"])
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(order.number, mail.outbox[0].subject)
+        self.assertIn(self.user.email, mail.outbox[0].to)
+
+    def test_track_lookup_by_email_lists_orders(self):
+        self._order()
+        response = self.client.get(reverse("orders:track_lookup"), {"number": self.user.email})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "CB")
+
+    def test_track_lookup_by_number_redirects(self):
+        order = self._order()
+        response = self.client.get(reverse("orders:track_lookup"), {"number": order.number.lower()})
+        self.assertRedirects(response, reverse("orders:track", args=[order.number]))
+
+    def test_courier_live_flag(self):
+        order = self._order(status=Order.Status.OUT_FOR_DELIVERY, fulfillment="delivery")
+        self.assertFalse(order.courier_is_live)
+        order.courier_lat = Decimal("40.000000")
+        order.courier_lng = Decimal("-73.000000")
+        order.courier_updated_at = timezone.now()
+        order.save()
+        self.assertTrue(order.courier_is_live)
+
 
 
 

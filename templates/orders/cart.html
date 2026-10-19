@@ -76,7 +76,12 @@
         </form>
         <p class="small muted">We'll send a gentle reminder if you don't finish checking out.</p>
 
-        <a href="{% url 'orders:checkout' %}" class="btn btn-block mt-3">Proceed to checkout →</a>
+        {% if user.is_authenticated %}
+          <a href="{% url 'orders:checkout' %}" class="btn btn-block mt-3">Proceed to checkout →</a>
+        {% else %}
+          <a href="{% url 'accounts:login' %}?next={% url 'orders:checkout' %}" class="btn btn-block mt-3">Sign in to check out →</a>
+          <p class="form-hint mt-1">New here? <a href="{% url 'accounts:signup' %}" class="gradient-text">Create an account</a> — it takes a minute and earns you welcome beans.</p>
+        {% endif %}
         <a href="{% url 'store:menu' %}" class="btn btn-ghost btn-block mt-1">Continue shopping</a>
       </div>
     </div>

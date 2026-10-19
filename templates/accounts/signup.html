@@ -13,6 +13,7 @@
 
     <form method="post" data-lock-submit>
       {% csrf_token %}
+      {% if next %}<input type="hidden" name="next" value="{{ next }}" />{% endif %}
       {% if form.non_field_errors %}<div class="message error mb-2">{{ form.non_field_errors }}</div>{% endif %}
       <div class="form-grid">
         <div class="field">{{ form.first_name.label_tag }}{{ form.first_name }}{{ form.first_name.errors }}</div>
@@ -62,7 +63,7 @@
       <button class="btn btn-block" type="submit">Create account</button>
     </form>
     <div class="auth-foot mt-3">
-      <p class="small" style="margin:0">Already have an account? <a href="{% url 'accounts:login' %}" class="gradient-text">Sign in</a></p>
+      <p class="small" style="margin:0">Already have an account? <a href="{% url 'accounts:login' %}{% if next %}?next={{ next|urlencode }}{% endif %}" class="gradient-text">Sign in</a></p>
       <a href="{% url 'orders:track_lookup' %}" class="small link-quiet">Track a guest order →</a>
     </div>
   </div>

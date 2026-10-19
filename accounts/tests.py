@@ -66,6 +66,34 @@ class AccountTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "already exists")
         self.assertEqual(User.objects.filter(email__iexact="ada@example.com").count(), 1)
+    def test_signup_redirects_to_next_after_success(self):
+        response = self.client.post(
+            reverse("accounts:signup"),
+            {
+                "first_name": "Ada",
+                "last_name": "Lovelace",
+                "email": "next@example.com",
+                "password1": "S3curePass!23",
+                "password2": "S3curePass!23",
+                "next": "/orders/checkout/",
+            },
+        )
+        self.assertRedirects(response, "/orders/checkout/", fetch_redirect_response=False)
+
+    def test_signup_ignores_offsite_next(self):
+        response = self.client.post(
+            reverse("accounts:signup"),
+            {
+                "first_name": "Ada",
+                "last_name": "Lovelace",
+                "email": "evil-next@example.com",
+                "password1": "S3curePass!23",
+                "password2": "S3curePass!23",
+                "next": "https://evil.example.com/steal",
+            },
+        )
+        self.assertRedirects(response, reverse("accounts:dashboard"))
+
     def test_dashboard_requires_login(self):
         response = self.client.get(reverse("accounts:dashboard"))
         self.assertEqual(response.status_code, 302)

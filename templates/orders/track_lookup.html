@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Track your order — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="block" style="padding-top:3rem">
+  <div class="container" style="max-width:620px">
+    <span class="eyebrow">Order tracking</span>
+    <h1>Where's my coffee?</h1>
+    <p class="lead">Enter your order number, or the email you ordered with to see every order.</p>
+
+    <form method="get" action="{% url 'orders:track_lookup' %}" class="card panel mt-3">
+      <label for="number" class="small muted">Order number or email</label>
+      <input id="number" name="number" class="form-input mt-1"
+             placeholder="e.g. CB2610160001 or you@example.com"
+             value="{{ request.GET.number|default:'' }}" required>
+      <button class="btn mt-2" type="submit">Find my order</button>
+    </form>
+
+    <p class="small muted mt-2">
+      Signed in? <a href="{% url 'orders:history' %}">See all your orders →</a>
+    </p>
+  </div>
+</section>
+{% endblock %}

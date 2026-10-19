@@ -29,12 +29,8 @@
           <div class="field" id="address-field">{{ form.delivery_address.label_tag }}{{ form.delivery_address }}{{ form.delivery_address.errors }}</div>
           <div class="field">{{ form.note.label_tag }}{{ form.note }}</div>
 
-          {% if not user.is_authenticated %}
-            <div class="field">
-              <label>Email (for your receipt)</label>
-              <input type="email" name="guest_email" class="form-input" placeholder="you@example.com" required />
-              <p class="form-hint">Have an account? <a href="{% url 'accounts:login' %}" class="gradient-text">Sign in</a> to earn loyalty beans.</p>
-            </div>
+          {% if user.is_authenticated %}
+            <p class="pill-note mb-2">Signed in as <strong>{{ user.email }}</strong> — your receipt, order history and loyalty beans are saved to your account.</p>
           {% endif %}
         </div>
 

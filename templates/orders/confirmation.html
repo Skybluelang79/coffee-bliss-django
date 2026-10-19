@@ -32,6 +32,7 @@
 
     <div class="flex gap center wrap mt-3" style="justify-content:center">
       <a href="{% url 'orders:track' order.number %}" class="btn">Track my order</a>
+      <a href="{% url 'orders:receipt' order.number %}" class="btn btn-ghost">View receipt</a>
       <a href="{% url 'store:menu' %}" class="btn btn-ghost">Order something else</a>
     </div>
   </div>

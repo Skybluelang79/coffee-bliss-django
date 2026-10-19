@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Receipt {{ order.number }} — {{ SITE_NAME }}{% endblock %}
+{% block extra_head %}
+<style>
+  @media print {
+    .topbar, .navbar, .footer, .no-print, .cart-toast { display: none !important; }
+    .receipt { box-shadow: none !important; border: 0 !important; max-width: none; }
+    body { background: #fff !important; color: #000 !important; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<section class="block" style="padding-top:2.5rem">
+  <div class="container" style="max-width:680px">
+    <div class="flex between center wrap gap no-print">
+      <span class="eyebrow">Receipt</span>
+      <div class="flex gap">
+        <button class="btn" type="button" onclick="window.print()">Print / Save as PDF</button>
+        <a class="btn btn-ghost" href="{% url 'orders:track' order.number %}">Back to tracking</a>
+      </div>
+    </div>
+
+    <div class="card panel receipt mt-3">
+      <div class="flex between center">
+        <div>
+          <h2 style="margin:0">{{ SITE_NAME }}</h2>
+          <p class="small muted">{% if order.location %}{{ order.location.name }}{% else %}Online order{% endif %}</p>
+        </div>
+        <div style="text-align:right">
+          <strong>{{ order.number }}</strong><br>
+          <span class="small muted">{{ order.placed_at|date:"M j, Y · g:i A" }}</span><br>
+          <span class="status {{ order.status_color }}">{{ order.get_status_display }}</span>
+        </div>
+      </div>
+
+      <hr class="receipt-rule">
+
+      <table class="receipt-table">
+        <thead>
+          <tr><th>Item</th><th class="ta-r">Qty</th><th class="ta-r">Price</th><th class="ta-r">Amount</th></tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+            <tr>
+              <td>{{ item.name }}{% if item.options_display %} <span class="small muted">({{ item.options_display }})</span>{% endif %}</td>
+              <td class="ta-r">{{ item.quantity }}</td>
+              <td class="ta-r">{{ currency_symbol }}{{ item.unit_price|floatformat:2 }}</td>
+              <td class="ta-r">{{ currency_symbol }}{{ item.line_total|floatformat:2 }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="receipt-totals">
+        <div class="summary-row"><span>Subtotal</span><span>{{ currency_symbol }}{{ order.subtotal|floatformat:2 }}</span></div>
+        {% if order.discount %}<div class="summary-row"><span>Discount</span><span>-{{ currency_symbol }}{{ order.discount|floatformat:2 }}</span></div>{% endif %}
+        <div class="summary-row"><span>Delivery</span><span>{{ currency_symbol }}{{ order.delivery_fee|floatformat:2 }}</span></div>
+        <div class="summary-row"><span>Tax</span><span>{{ currency_symbol }}{{ order.tax|floatformat:2 }}</span></div>
+        {% if order.loyalty_discount %}<div class="summary-row"><span>Loyalty</span><span>-{{ currency_symbol }}{{ order.loyalty_discount|floatformat:2 }}</span></div>{% endif %}
+        {% if order.gift_card_amount %}<div class="summary-row"><span>Gift card</span><span>-{{ currency_symbol }}{{ order.gift_card_amount|floatformat:2 }}</span></div>{% endif %}
+        {% if order.tip %}<div class="summary-row"><span>Tip</span><span>{{ currency_symbol }}{{ order.tip|floatformat:2 }}</span></div>{% endif %}
+        <div class="summary-row total"><span>Total</span><span>{{ currency_symbol }}{{ order.total|floatformat:2 }}</span></div>
+      </div>
+
+      <hr class="receipt-rule">
+      <p class="small muted">
+        Payment: {{ order.get_payment_status_display }}<br>
+        {% if order.fulfillment == 'delivery' and order.delivery_address %}
+          Deliver to: {{ order.delivery_address }}<br>
+        {% endif %}
+        Customer: {{ order.customer_name }}
+      </p>
+      <p class="small muted" style="text-align:center;margin-top:1rem">Thank you for choosing {{ SITE_NAME }} ☕</p>
+    </div>
+  </div>
+</section>
+{% endblock %}
