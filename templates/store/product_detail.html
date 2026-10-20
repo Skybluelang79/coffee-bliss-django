@@ -15,8 +15,8 @@
 
     <div class="pd-grid mt-2">
       <div class="pd-media reveal">
-        {% if product.image %}
-          <img src="{{ product.image.url }}" alt="{{ product.name }}" />
+        {% if product.display_image %}
+          <img src="{{ product.display_image }}" alt="{{ product.name }}" />
         {% else %}
           <div class="pd-emoji">{{ product.category.icon|default:"☕" }}</div>
           <canvas class="product-canvas" width="640" height="640" aria-hidden="true"

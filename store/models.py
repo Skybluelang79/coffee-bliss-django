@@ -2,6 +2,7 @@ from decimal import Decimal
 import re
 
 from django.conf import settings
+from django.contrib.staticfiles import finders
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.models import Avg, Count
@@ -16,6 +17,20 @@ class TimeStampedModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+def _static_image(folder, slug):
+    """Return the URL of a bundled static image for a slug, if one exists."""
+    from django.templatetags.static import static
+
+    for ext in (".png", ".jpg", ".jpeg", ".webp"):
+        rel = f"img/{folder}/{slug}{ext}"
+        try:
+            if finders.find(rel):
+                return static(rel)
+        except Exception:
+            continue
+    return ""
 
 
 class Category(TimeStampedModel):
@@ -43,6 +58,12 @@ class Category(TimeStampedModel):
 
     def get_absolute_url(self):
         return reverse("store:menu") + f"?category={self.slug}"
+
+    @property
+    def display_image(self):
+        if self.image:
+            return self.image.url
+        return _static_image("categories", self.slug)
 
     @property
     def product_count(self):
@@ -133,6 +154,12 @@ class Product(TimeStampedModel):
 
     def get_absolute_url(self):
         return reverse("store:product_detail", args=[self.slug])
+
+    @property
+    def display_image(self):
+        if self.image:
+            return self.image.url
+        return _static_image("products", self.slug)
 
     @property
     def discount_percent(self):

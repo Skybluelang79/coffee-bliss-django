@@ -75,10 +75,10 @@ class ProductAdmin(admin.ModelAdmin):
 
     @admin.display(description="")
     def thumb(self, obj):
-        if obj.image:
+        if obj.display_image:
             return format_html(
                 '<img src="{}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;" />',
-                obj.image.url,
+                obj.display_image,
             )
         return "☕"
 

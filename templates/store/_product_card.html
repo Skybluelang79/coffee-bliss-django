@@ -1,8 +1,8 @@
 {% load static humanize %}
 <article class="product-card reveal" data-tilt>
   <a href="{{ product.get_absolute_url }}" class="product-media">
-    {% if product.image %}
-      <img src="{{ product.image.url }}" alt="{{ product.name }}" loading="lazy" />
+    {% if product.display_image %}
+      <img src="{{ product.display_image }}" alt="{{ product.name }}" loading="lazy" />
     {% else %}
       <div class="emoji-fallback">{{ product.category.icon|default:"☕" }}</div>
       <canvas class="product-canvas" width="512" height="384" aria-hidden="true"

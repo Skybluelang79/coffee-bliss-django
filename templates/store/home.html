@@ -92,6 +92,42 @@
     font-size: 0.9rem;
     color: var(--text);
   }
+  .circular-menu-item.has-img {
+    overflow: hidden;
+    padding: 0;
+    border-width: 5px;
+  }
+  .circular-menu-item.has-img img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    transition: transform 0.4s ease;
+  }
+  .circular-menu-item.has-img:hover img {
+    transform: scale(1.08);
+  }
+  .circular-menu-item.has-img .label {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0.55rem 0.4rem 0.5rem;
+    background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.75));
+    color: #fff;
+    font-size: 0.82rem;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+    z-index: 1;
+  }
+  .category-card-img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 14px;
+    margin-bottom: 0.9rem;
+  }
   @keyframes float {
     0%, 100% { transform: translateY(0px); }
     50% { transform: translateY(-10px); }
@@ -175,12 +211,19 @@
         </div>
       </div>
       {% for category in categories|slice:":4" %}
-        <a href="{{ category.get_absolute_url }}" class="circular-menu-item item-{{ forloop.counter }}">
-          <div>
-            <div class="emoji">{{ category.icon|default:"☕" }}</div>
+        {% if category.display_image %}
+          <a href="{{ category.get_absolute_url }}" class="circular-menu-item has-img item-{{ forloop.counter }}">
+            <img src="{{ category.display_image }}" alt="{{ category.name }}" loading="lazy" />
             <div class="label">{{ category.name }}</div>
-          </div>
-        </a>
+          </a>
+        {% else %}
+          <a href="{{ category.get_absolute_url }}" class="circular-menu-item item-{{ forloop.counter }}">
+            <div>
+              <div class="emoji">{{ category.icon|default:"☕" }}</div>
+              <div class="label">{{ category.name }}</div>
+            </div>
+          </a>
+        {% endif %}
       {% empty %}
         <a href="{% url 'store:menu' %}?kind=drink" class="circular-menu-item item-1">
           <div><div class="emoji">☕</div><div class="label">Coffee</div></div>
@@ -211,7 +254,11 @@
     <div class="grid grid-4">
       {% for category in categories %}
         <a href="{{ category.get_absolute_url }}" class="card reveal" data-tilt style="padding:1.4rem;text-align:center">
-          <div style="font-size:2.6rem">{{ category.icon|default:"☕" }}</div>
+          {% if category.display_image %}
+            <img src="{{ category.display_image }}" alt="{{ category.name }}" loading="lazy" class="category-card-img" />
+          {% else %}
+            <div style="font-size:2.6rem">{{ category.icon|default:"☕" }}</div>
+          {% endif %}
           <h3 class="mt-1" style="font-size:1.1rem">{{ category.name }}</h3>
           <p class="small">{{ category.product_count }} items</p>
         </a>

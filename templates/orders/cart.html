@@ -13,7 +13,7 @@
         {% for line in cart %}
           <div class="cart-item">
             <div class="cart-thumb">
-              {% if line.product.image %}<img src="{{ line.product.image.url }}" alt="{{ line.product.name }}" />{% else %}{{ line.product.category.icon|default:"☕" }}{% endif %}
+              {% if line.product.display_image %}<img src="{{ line.product.display_image }}" alt="{{ line.product.name }}" />{% else %}{{ line.product.category.icon|default:"☕" }}{% endif %}
             </div>
             <div>
               <strong><a href="{{ line.product.get_absolute_url }}">{{ line.product.name }}</a></strong>
