@@ -27,12 +27,17 @@ def home(request):
     )
     if not featured:
         featured = Product.objects.filter(is_active=True).select_related("category")[:8]
+    best_sellers = (
+        Product.objects.filter(is_active=True)
+        .annotate(sold=Count("order_items"))
+        .order_by("-sold", "-is_featured", "name")[:8]
+    )
+    if not best_sellers:
+        best_sellers = Product.objects.filter(is_active=True).select_related("category")[:8]
     context = {
         "featured_products": featured,
         "new_arrivals": Product.objects.filter(is_active=True, is_new=True)[:4],
-        "best_sellers": Product.objects.filter(is_active=True)
-        .annotate(sold=Count("order_items"))
-        .order_by("-sold")[:4],
+        "best_sellers": best_sellers,
         "categories": Category.objects.filter(is_active=True)[:6],
         "plans": SubscriptionPlan.objects.filter(is_active=True)[:3],
         "posts": BlogPost.objects.filter(is_published=True)[:3],

@@ -279,7 +279,7 @@
       </div>
     </div>
     <div class="grid grid-4">
-      {% for product in featured_products %}
+      {% for product in best_sellers %}
         {% include "store/_product_card.html" with product=product %}
       {% empty %}
         <p class="muted">No products yet — add some in the admin!</p>
