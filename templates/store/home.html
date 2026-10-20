@@ -5,6 +5,132 @@
 
 {% block extra_head %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+<style>
+  .circular-menu-section {
+    padding: 5rem 0 3rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .circular-menu-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(200, 150, 62, 0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .circular-menu-container {
+    position: relative;
+    max-width: 900px;
+    margin: 0 auto;
+    display: grid;
+    place-items: center;
+    min-height: 500px;
+  }
+  .circular-menu-center {
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--brand-2), var(--brand-3));
+    display: grid;
+    place-items: center;
+    text-align: center;
+    color: #1b1108;
+    box-shadow: 0 30px 60px -20px rgba(200, 150, 62, 0.5);
+    position: relative;
+    z-index: 2;
+    animation: pulse 3s ease-in-out infinite;
+  }
+  .circular-menu-center h2 {
+    font-size: 1.8rem;
+    margin: 0;
+    line-height: 1.2;
+  }
+  .circular-menu-center p {
+    color: #2a1a12;
+    margin: 0.3rem 0 0;
+    font-size: 0.9rem;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+  .circular-menu-item {
+    position: absolute;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    border: 4px solid var(--brand-2);
+    background: var(--surface);
+    display: grid;
+    place-items: center;
+    text-align: center;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: var(--shadow-2);
+    text-decoration: none;
+    animation: float 4s ease-in-out infinite;
+  }
+  .circular-menu-item > div {
+    transition: transform 0.3s ease;
+  }
+  .circular-menu-item:nth-child(2) { animation-delay: 0.5s; }
+  .circular-menu-item:nth-child(3) { animation-delay: 1s; }
+  .circular-menu-item:nth-child(4) { animation-delay: 1.5s; }
+  .circular-menu-item:hover {
+    border-color: var(--brand);
+    box-shadow: 0 20px 40px rgba(200, 150, 62, 0.3);
+    animation-play-state: paused;
+  }
+  .circular-menu-item:hover > div {
+    transform: scale(1.12);
+  }
+  .circular-menu-item .emoji {
+    font-size: 2.5rem;
+    margin-bottom: 0.3rem;
+  }
+  .circular-menu-item .label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text);
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+  .item-1 { top: 10%; left: 15%; }
+  .item-2 { top: 10%; right: 15%; }
+  .item-3 { bottom: 10%; left: 15%; }
+  .item-4 { bottom: 10%; right: 15%; }
+  @media (max-width: 768px) {
+    .circular-menu-container {
+      min-height: 0;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+      max-width: 520px;
+    }
+    .circular-menu-center {
+      position: static;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      border-radius: 22px;
+      padding: 1.4rem 1rem;
+      order: -1;
+      margin-bottom: 1rem;
+      animation: none;
+    }
+    .circular-menu-item {
+      position: static;
+      width: 130px;
+      height: 130px;
+      animation: none;
+    }
+    .circular-menu-item .emoji { font-size: 2rem; }
+    .circular-menu-item .label { font-size: 0.8rem; }
+  }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -15,7 +141,7 @@
 
   <div class="container hero-grid">
     <div class="hero-copy">
-      <span class="eyebrow">Small-batch · Freshly roasted · Delivered</span>
+      <span class="eyebrow">Small-batch • Freshly roasted • Delivered</span>
       <h1>Your daily cup of <span class="gradient-text">pure bliss</span>, poured in 3D.</h1>
       <p class="lead">Explore single-origin beans, handcrafted espresso and cozy café moments — all from a beautifully immersive ordering experience built for coffee lovers.</p>
       <div class="hero-cta">
@@ -28,6 +154,47 @@
         <div class="stat"><b>{{ stats.locations }}</b><span>Cafés</span></div>
         <div class="stat"><b>2M+</b><span>Cups poured</span></div>
       </div>
+    </div>
+  </div>
+</section>
+
+<section class="circular-menu-section">
+  <div class="container">
+    <div class="section-head reveal" style="justify-content:center;text-align:center;margin-bottom:3rem">
+      <div>
+        <span class="eyebrow">Bliss Menu</span>
+        <h2>Explore Our Categories</h2>
+        <p>Discover your perfect blend from our carefully curated selections</p>
+      </div>
+    </div>
+    <div class="circular-menu-container reveal">
+      <div class="circular-menu-center">
+        <div>
+          <h2>Coffee<br><span class="gradient-text">Bliss</span></h2>
+          <p>Menu Bliss</p>
+        </div>
+      </div>
+      {% for category in categories|slice:":4" %}
+        <a href="{{ category.get_absolute_url }}" class="circular-menu-item item-{{ forloop.counter }}">
+          <div>
+            <div class="emoji">{{ category.icon|default:"☕" }}</div>
+            <div class="label">{{ category.name }}</div>
+          </div>
+        </a>
+      {% empty %}
+        <a href="{% url 'store:menu' %}?kind=drink" class="circular-menu-item item-1">
+          <div><div class="emoji">☕</div><div class="label">Coffee</div></div>
+        </a>
+        <a href="{% url 'store:menu' %}?kind=food" class="circular-menu-item item-2">
+          <div><div class="emoji">🥐</div><div class="label">Breakfast</div></div>
+        </a>
+        <a href="{% url 'store:menu' %}?kind=beans" class="circular-menu-item item-3">
+          <div><div class="emoji">🫘</div><div class="label">Beans</div></div>
+        </a>
+        <a href="{% url 'store:menu' %}?kind=merch" class="circular-menu-item item-4">
+          <div><div class="emoji">🛍️</div><div class="label">Merch</div></div>
+        </a>
+      {% endfor %}
     </div>
   </div>
 </section>
@@ -57,11 +224,11 @@
 
 <section class="block" style="background:linear-gradient(180deg, transparent, rgba(200,150,62,.04), transparent)">
   <div class="container">
-    <div class="section-head reveal">
+    <div class="section-head reveal" style="text-align:center;justify-content:center">
       <div>
         <span class="eyebrow">Loved by the community</span>
-        <h2>Featured favorites</h2>
-        <p>Hand-picked drinks and beans our regulars can't stop ordering.</p>
+        <h2>Best Seller</h2>
+        <p>Discover our <span style="color:var(--brand);font-weight:600">most-loved</span> items, <span style="color:var(--brand);font-weight:600">carefully selected</span> by our <span style="color:var(--brand);font-weight:600">customers</span>.</p>
       </div>
     </div>
     <div class="grid grid-4">
