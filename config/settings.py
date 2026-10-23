@@ -181,6 +181,12 @@ STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")
 STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
 STRIPE_CURRENCY = env("STRIPE_CURRENCY", default="ngn")
 
+# Paystack payments (preferred for NGN card payments). Leave the secret key
+# blank to disable Paystack.
+PAYSTACK_PUBLIC_KEY = env("PAYSTACK_PUBLIC_KEY", default="")
+PAYSTACK_SECRET_KEY = env("PAYSTACK_SECRET_KEY", default="")
+PAYSTACK_CURRENCY = env("PAYSTACK_CURRENCY", default=CURRENCY_CODE)
+
 # Kitchen display system
 KDS_ENABLED = env.bool("KDS_ENABLED", default=True)
 

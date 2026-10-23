@@ -20,3 +20,9 @@ services:
         value: "Coffee Bliss"
       - key: KDS_ENABLED
         value: "True"
+      - key: PAYSTACK_PUBLIC_KEY
+        sync: false
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_CURRENCY
+        value: "NGN"

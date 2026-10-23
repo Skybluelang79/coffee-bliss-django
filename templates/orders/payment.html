@@ -3,7 +3,7 @@
 {% block title %}Secure payment — {{ SITE_NAME }}{% endblock %}
 
 {% block extra_head %}
-{% if not simulated %}<script src="https://js.stripe.com/v3/"></script>{% endif %}
+{% if provider == "stripe" %}<script src="https://js.stripe.com/v3/"></script>{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -15,18 +15,32 @@
 
     <div class="card panel mt-3">
       {% if provider_error %}<div class="message warning mb-2">{{ provider_error }}</div>{% endif %}
-      {% if simulated %}
+      {% if provider == "simulated" %}
         <h3>Demo payment gateway</h3>
-        <p class="small">Stripe keys are not configured, so this is a simulated card payment. No real money moves.</p>
+        <p class="small">Card keys are not configured, so this is a simulated card payment. No real money moves.</p>
         <form method="post" action="{% url 'orders:payment_simulate' order.number %}">
           {% csrf_token %}
           <button class="btn btn-block mt-2">Pay {{ currency }}{{ order.total|floatformat:2 }} now</button>
         </form>
+      {% elif provider == "paystack" %}
+        <h3>Pay with Paystack</h3>
+        <p class="small">Pay securely with your credit or debit card. You'll be redirected to Paystack to complete the payment.</p>
+        <form method="post" action="{% url 'orders:paystack_initialize' order.number %}">
+          {% csrf_token %}
+          <button class="btn btn-block mt-2">Pay {{ currency }}{{ order.total|floatformat:2 }} with Paystack</button>
+        </form>
+        <p class="form-hint mt-1">Test card: 4084 0840 8408 4081 · any future date · CVV 408 · PIN 0000 · OTP 123456.</p>
+        {% if "stripe" in providers %}
+          <a href="?provider=stripe" class="btn btn-ghost btn-block mt-2">Pay with Stripe instead</a>
+        {% endif %}
       {% else %}
         <div id="payment-element"></div>
         <button id="submit" class="btn btn-block mt-3">Pay {{ currency }}{{ order.total|floatformat:2 }}</button>
         <div id="payment-message" class="small mt-2"></div>
         <p class="form-hint mt-1">Test card: 4242 4242 4242 4242 · any future date · any CVC.</p>
+        {% if "paystack" in providers %}
+          <a href="?provider=paystack" class="btn btn-ghost btn-block mt-2">Pay with Paystack instead</a>
+        {% endif %}
       {% endif %}
       <a href="{% url 'orders:track' order.number %}" class="btn btn-ghost btn-block mt-2">Pay later — back to my order</a>
     </div>
@@ -35,7 +49,7 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if not simulated %}
+{% if provider == "stripe" %}
 <script>
   const stripe = Stripe("{{ stripe_publishable_key }}");
   const clientSecret = "{{ client_secret }}";

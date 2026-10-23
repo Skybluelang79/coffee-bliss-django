@@ -44,7 +44,11 @@
             <input type="radio" name="payment_method" value="cash" class="form-check" hidden />
             💵 Pay at pickup / on delivery
           </label>
-          <p class="form-hint mt-1">Card payments are processed securely by Stripe — a demo gateway is used when no keys are configured.</p>
+          <p class="form-hint mt-1">
+            {% if "paystack" in providers %}Card payments are processed securely by Paystack.
+            {% elif "stripe" in providers %}Card payments are processed securely by Stripe.
+            {% else %}A demo card gateway is used because no payment keys are configured.{% endif %}
+          </p>
         </div>
       </div>
 

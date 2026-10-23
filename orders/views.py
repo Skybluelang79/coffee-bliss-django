@@ -2,7 +2,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -180,7 +180,11 @@ def checkout(request):
     else:
         form = CheckoutForm(initial=initial)
 
-    return render(request, "orders/checkout.html", {"cart": cart, "form": form})
+    return render(
+        request,
+        "orders/checkout.html",
+        {"cart": cart, "form": form, "providers": payments.available_providers()},
+    )
 
 
 def _create_order(request, cart, form):
@@ -272,10 +276,16 @@ def payment_page(request, number):
     if order.payment_status == Order.PaymentStatus.PAID:
         return redirect("orders:order_confirmation", number=order.number)
 
+    providers = payments.available_providers()
+    requested_provider = request.GET.get("provider", "")
+    if requested_provider in providers:
+        provider = requested_provider
+    else:
+        provider = providers[0] if providers else "simulated"
+
     provider_error = ""
     intent = None
-    use_stripe = payments.is_configured() and bool(settings.STRIPE_PUBLISHABLE_KEY)
-    if use_stripe:
+    if provider == "stripe":
         try:
             intent = payments.create_payment_intent(order)
         except Exception as exc:  # bad keys, unsupported currency, network…
@@ -284,12 +294,22 @@ def payment_page(request, number):
             logging.getLogger(__name__).warning(
                 "Payment intent failed for %s: %s", order.number, exc
             )
-            provider_error = (
-                "We couldn't reach the payment provider, so the demo gateway "
-                "below is ready to use — no real money moves in demo mode."
-            )
-    if intent is None:
+            if "paystack" in providers:
+                provider = "paystack"
+                provider_error = (
+                    "We couldn't reach Stripe, so you can pay securely with "
+                    "Paystack instead."
+                )
+            else:
+                provider = "simulated"
+                provider_error = (
+                    "We couldn't reach the payment provider, so the demo gateway "
+                    "below is ready to use — no real money moves in demo mode."
+                )
+    if provider == "simulated":
         intent = payments.create_payment_intent(order, force_simulated=True)
+
+    intent = intent or {"client_secret": "", "payment_intent_id": "", "simulated": False}
     return render(
         request,
         "orders/payment.html",
@@ -298,7 +318,10 @@ def payment_page(request, number):
             "client_secret": intent["client_secret"],
             "payment_intent_id": intent["payment_intent_id"],
             "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
-            "simulated": intent["simulated"],
+            "paystack_public_key": settings.PAYSTACK_PUBLIC_KEY,
+            "providers": providers,
+            "provider": provider,
+            "simulated": provider == "simulated",
             "provider_error": provider_error,
             "currency": settings.CURRENCY_SYMBOL,
         },
@@ -309,19 +332,79 @@ def payment_page(request, number):
 def payment_simulate(request, number):
     """Demo gateway: mark a simulated card payment as successful."""
     order = get_object_or_404(Order, number=number)
-    if not payments.is_configured():
+    if not payments.any_provider_configured():
         payments.simulate_success(order, user=request.user if request.user.is_authenticated else None)
         messages.success(request, f"Payment received for order {order.number}.")
         return redirect("orders:order_confirmation", number=order.number)
     return redirect("orders:payment", number=order.number)
 
 
+@require_POST
+def paystack_initialize(request, number):
+    """Create a Paystack transaction and send the customer to its checkout."""
+    order = get_object_or_404(Order, number=number)
+    if order.payment_status == Order.PaymentStatus.PAID:
+        return redirect("orders:order_confirmation", number=order.number)
+    if not payments.is_paystack_configured():
+        messages.error(request, "Paystack is not configured.")
+        return redirect("orders:payment", number=order.number)
+
+    callback_url = (
+        f"{settings.SITE_URL.rstrip('/')}"
+        f"{reverse('orders:paystack_callback', args=[order.number])}"
+    )
+    try:
+        transaction = payments.create_paystack_transaction(
+            order, callback_url=callback_url
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "Paystack initialization failed for %s", order.number
+        )
+        messages.error(
+            request, "We couldn't start the Paystack payment. Please try again."
+        )
+        return redirect(
+            f"{reverse('orders:payment', args=[order.number])}?provider=paystack"
+        )
+    return redirect(transaction["authorization_url"])
+
+
+def paystack_callback(request, number):
+    """Verify the transaction Paystack redirects to after checkout."""
+    order = get_object_or_404(Order, number=number)
+    if order.payment_status == Order.PaymentStatus.PAID:
+        return redirect("orders:order_confirmation", number=order.number)
+
+    reference = request.GET.get("reference") or request.GET.get("trxref") or ""
+    ok, error = payments.verify_paystack_payment(order, reference)
+    if ok:
+        messages.success(
+            request, f"Payment received for order {order.number}. Thank you!"
+        )
+        return redirect("orders:order_confirmation", number=order.number)
+
+    messages.error(request, error or "We couldn't verify your payment.")
+    return redirect(
+        f"{reverse('orders:payment', args=[order.number])}?provider=paystack"
+    )
+
+
 @csrf_exempt
 @require_POST
 def stripe_webhook(request):
     handled, message = payments.handle_webhook_event(request.body, request.META.get("HTTP_STRIPE_SIGNATURE", ""))
-    from django.http import HttpResponse
+    return HttpResponse(message, status=200 if handled else 400)
 
+
+@csrf_exempt
+@require_POST
+def paystack_webhook(request):
+    handled, message = payments.handle_paystack_webhook(
+        request.body, request.META.get("HTTP_X_PAYSTACK_SIGNATURE", "")
+    )
     return HttpResponse(message, status=200 if handled else 400)
 
 

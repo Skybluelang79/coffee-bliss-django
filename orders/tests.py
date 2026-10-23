@@ -1,3 +1,6 @@
+import hashlib
+import hmac
+import json
 from decimal import Decimal
 from datetime import timedelta
 from unittest.mock import patch
@@ -381,6 +384,210 @@ class PaymentFlowTests(TestCase):
             reverse("orders:stripe_webhook"), data="{}", content_type="application/json"
         )
         self.assertEqual(response.status_code, 400)
+
+
+@FAST
+@override_settings(
+    STRIPE_SECRET_KEY="",
+    STRIPE_PUBLISHABLE_KEY="",
+    PAYSTACK_SECRET_KEY="sk_test_paystack",
+    PAYSTACK_PUBLIC_KEY="pk_test_paystack",
+    PAYSTACK_CURRENCY="NGN",
+)
+class PaystackPaymentTests(TestCase):
+    def setUp(self):
+        self.category = Category.objects.create(name="Coffee", icon="☕")
+        self.product = Product.objects.create(
+            name="Latte", category=self.category, kind=Product.Kind.DRINK,
+            price=Decimal("4.00"), track_stock=False,
+        )
+        self.beans = Ingredient.objects.create(
+            name="Beans", unit=Ingredient.Unit.GRAM, stock=Decimal("1000"),
+            cost_per_unit=Decimal("0.02"),
+        )
+        RecipeItem.objects.create(product=self.product, ingredient=self.beans, quantity=Decimal("20"))
+        self.user = User.objects.create_user(email="buyer@example.com", password="pw")
+
+    def _place_order(self):
+        self.client.login(email="buyer@example.com", password="pw")
+        self.client.post(reverse("orders:cart_add", args=[self.product.pk]), {"quantity": 2})
+        return self.client.post(
+            reverse("orders:checkout"),
+            {
+                "fulfillment": "pickup",
+                "payment_method": "card",
+                "customer_name": "Buyer",
+                "customer_phone": "555",
+                "coupon_code": "",
+            },
+        )
+
+    def _payload(self, order, reference="PS-REF-1", amount=None):
+        return {
+            "status": "success",
+            "reference": reference,
+            "amount": int(order.total * 100) if amount is None else amount,
+            "currency": "NGN",
+            "metadata": {"order_number": order.number},
+        }
+
+    def test_payment_page_offers_paystack(self):
+        self._place_order()
+        order = Order.objects.get()
+        page = self.client.get(reverse("orders:payment", args=[order.number]))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Pay with Paystack")
+        self.assertNotContains(page, "Demo payment gateway")
+
+    def test_initialize_redirects_to_paystack_checkout(self):
+        self._place_order()
+        order = Order.objects.get()
+
+        def fake_request(method, path, payload=None):
+            return {
+                "status": True,
+                "data": {
+                    "authorization_url": "https://checkout.paystack.com/test",
+                    "access_code": "access",
+                    "reference": payload["reference"],
+                },
+            }
+
+        with patch("orders.payments._paystack_request", side_effect=fake_request) as api:
+            response = self.client.post(
+                reverse("orders:paystack_initialize", args=[order.number])
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "https://checkout.paystack.com/test")
+        args = api.call_args.args
+        self.assertEqual(args[0], "POST")
+        self.assertEqual(args[1], "/transaction/initialize")
+        self.assertEqual(args[2]["amount"], int(order.total * 100))
+        self.assertEqual(args[2]["currency"], "NGN")
+        self.assertEqual(args[2]["email"], "buyer@example.com")
+        self.assertEqual(args[2]["channels"], ["card"])
+        payment = order.payments.get()
+        self.assertTrue(payment.paystack_reference.startswith("CBPS-"))
+
+    def test_callback_marks_order_paid(self):
+        self._place_order()
+        order = Order.objects.get()
+        data = self._payload(order, reference="PS-REF-CALLBACK")
+        with patch(
+            "orders.payments.verify_paystack_transaction", return_value=data
+        ):
+            response = self.client.get(
+                reverse("orders:paystack_callback", args=[order.number])
+                + "?reference=PS-REF-CALLBACK"
+            )
+
+        self.assertRedirects(
+            response, reverse("orders:order_confirmation", args=[order.number])
+        )
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, Order.PaymentStatus.PAID)
+        self.assertEqual(order.payments.get().paystack_reference, "PS-REF-CALLBACK")
+        self.beans.refresh_from_db()
+        self.assertEqual(self.beans.stock, Decimal("960"))
+
+    def test_callback_rejects_wrong_amount(self):
+        self._place_order()
+        order = Order.objects.get()
+        data = self._payload(order, reference="PS-REF-LOW", amount=100)
+        with patch(
+            "orders.payments.verify_paystack_transaction", return_value=data
+        ):
+            response = self.client.get(
+                reverse("orders:paystack_callback", args=[order.number])
+                + "?reference=PS-REF-LOW"
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(
+            reverse("orders:payment", args=[order.number]), response.url
+        )
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, Order.PaymentStatus.UNPAID)
+        self.beans.refresh_from_db()
+        self.assertEqual(self.beans.stock, Decimal("1000"))
+
+    def test_webhook_marks_order_paid(self):
+        self._place_order()
+        order = Order.objects.get()
+        payload = json.dumps(
+            {"event": "charge.success", "data": self._payload(order, "PS-REF-HOOK")}
+        ).encode()
+        signature = hmac.new(
+            b"sk_test_paystack", payload, hashlib.sha512
+        ).hexdigest()
+
+        response = self.client.post(
+            reverse("orders:paystack_webhook"),
+            data=payload,
+            content_type="application/json",
+            HTTP_X_PAYSTACK_SIGNATURE=signature,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, Order.PaymentStatus.PAID)
+        self.assertEqual(order.payments.get().paystack_reference, "PS-REF-HOOK")
+
+    def test_webhook_rejects_bad_signature(self):
+        self._place_order()
+        order = Order.objects.get()
+        payload = json.dumps(
+            {"event": "charge.success", "data": self._payload(order, "PS-REF-BAD")}
+        ).encode()
+
+        response = self.client.post(
+            reverse("orders:paystack_webhook"),
+            data=payload,
+            content_type="application/json",
+            HTTP_X_PAYSTACK_SIGNATURE="nope",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, Order.PaymentStatus.UNPAID)
+
+    def test_demo_gateway_is_disabled_when_paystack_configured(self):
+        self._place_order()
+        order = Order.objects.get()
+        self.client.post(reverse("orders:payment_simulate", args=[order.number]))
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, Order.PaymentStatus.UNPAID)
+
+    def test_refund_uses_paystack(self):
+        from orders import payments
+
+        self._place_order()
+        order = Order.objects.get()
+        data = self._payload(order, reference="PS-REF-REFUND")
+        with patch("orders.payments.verify_paystack_transaction", return_value=data):
+            self.client.get(
+                reverse("orders:paystack_callback", args=[order.number])
+                + "?reference=PS-REF-REFUND"
+            )
+        order.refresh_from_db()
+
+        with patch(
+            "orders.payments._paystack_request",
+            return_value={"status": True, "data": {}},
+        ) as api:
+            ok, error = payments.refund_order(order)
+
+        self.assertTrue(ok, error)
+        args = api.call_args.args
+        self.assertEqual(args[0], "POST")
+        self.assertEqual(args[1], "/refund")
+        self.assertEqual(args[2]["transaction"], "PS-REF-REFUND")
+        self.assertEqual(args[2]["amount"], int(order.total * 100))
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, Order.PaymentStatus.REFUNDED)
+        self.beans.refresh_from_db()
+        self.assertEqual(self.beans.stock, Decimal("1000"))
 
 
 @FAST
