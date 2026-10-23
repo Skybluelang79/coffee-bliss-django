@@ -13,7 +13,15 @@ from django.utils import timezone
 
 from accounts.models import Address, LoyaltyTransaction, User
 from inventory.models import Ingredient, RecipeItem, StockMovement, Supplier
-from orders.models import Order, OrderItem, OrderStatusHistory, Payment, Reservation, Table
+from orders.models import (
+    Order,
+    OrderItem,
+    OrderStatusHistory,
+    Payment,
+    Reservation,
+    Subscription,
+    Table,
+)
 from store.models import (
     BaristaNote,
     BlogPost,
@@ -55,8 +63,11 @@ class Command(BaseCommand):
             Supplier.objects.all().delete()
             OrderItem.objects.all().delete()
             Order.objects.all().delete()
+            Subscription.objects.all().delete()
             Product.objects.all().delete()
             Category.objects.all().delete()
+            SubscriptionPlan.objects.all().delete()
+            Coupon.objects.all().delete()
 
         admin = self._users()
         locations = self._locations()
@@ -180,24 +191,24 @@ class Command(BaseCommand):
     def _products(self, categories):
         catalog = [
             # (name, category, kind, roast, price, compare, featured, new, desc, origin)
-            ("Signature House Blend", "Beans & Grounds", "beans", "medium", "16.50", "19.00", True, False, "Our flagship blend — chocolatey, nutty and endlessly drinkable.", "Colombia"),
-            ("Ethiopia Yirgacheffe", "Beans & Grounds", "beans", "light", "21.00", None, True, True, "Bright and floral with notes of jasmine and stone fruit.", "Ethiopia"),
-            ("Sumatra Dark Roast", "Beans & Grounds", "beans", "dark", "18.00", None, False, False, "Bold, earthy and full-bodied with a syrupy finish.", "Indonesia"),
-            ("Classic Espresso", "Espresso & Coffee", "drink", "espresso", "3.25", None, True, False, "A perfect double shot pulled from our house blend.", None),
-            ("Caramel Latte", "Espresso & Coffee", "drink", "espresso", "4.75", "5.25", True, False, "Silky steamed milk, espresso and house caramel.", None),
-            ("Vanilla Cappuccino", "Espresso & Coffee", "drink", "espresso", "4.50", None, False, False, "Espresso topped with velvety microfoam and vanilla.", None),
-            ("Flat White", "Espresso & Coffee", "drink", "espresso", "4.60", None, True, False, "Ristretto shots with silky steamed milk.", None),
-            ("Mocha Bliss", "Espresso & Coffee", "drink", "espresso", "5.00", None, False, True, "Espresso, chocolate and cream — pure indulgence.", None),
-            ("Vanilla Cold Brew", "Cold Brew", "drink", "espresso", "4.95", None, True, False, "18-hour steeped cold brew with a touch of vanilla.", None),
-            ("Salted Caramel Cold Brew", "Cold Brew", "drink", "espresso", "5.25", "5.75", False, False, "Cold brew swirled with salted caramel and cream.", None),
-            ("Nitro Cold Brew", "Cold Brew", "drink", "espresso", "5.50", None, True, True, "Nitrogen-infused for a cascading, creamy pour.", None),
-            ("Spiced Chai Latte", "Tea & Chai", "drink", "na", "4.40", None, False, False, "Aromatic masala chai with steamed milk.", None),
-            ("Matcha Latte", "Tea & Chai", "drink", "na", "4.90", None, False, True, "Ceremonial-grade matcha whisked with milk.", None),
-            ("Butter Croissant", "Bakery & Food", "food", "na", "3.50", None, False, False, "Flaky, buttery and baked fresh daily.", None),
-            ("Almond Biscotti", "Bakery & Food", "food", "na", "2.75", None, False, False, "Crunchy twice-baked biscotti — perfect with coffee.", None),
-            ("Avocado Toast", "Bakery & Food", "food", "na", "7.50", None, False, False, "Sourdough, smashed avocado, chili flakes and lime.", None),
-            ("Coffee Bliss Ceramic Mug", "Merchandise", "merch", "na", "14.00", None, False, False, "A 12oz hand-glazed ceramic mug in Cream.", None),
-            ("Insulated Travel Tumbler", "Merchandise", "merch", "na", "24.00", "28.00", True, False, "Keeps drinks hot for 6 hours. Because you deserve it.", None),
+            ("Signature House Blend", "Beans & Grounds", "beans", "medium", "16500.00", "19000.00", True, False, "Our flagship blend — chocolatey, nutty and endlessly drinkable.", "Colombia"),
+            ("Ethiopia Yirgacheffe", "Beans & Grounds", "beans", "light", "21000.00", None, True, True, "Bright and floral with notes of jasmine and stone fruit.", "Ethiopia"),
+            ("Sumatra Dark Roast", "Beans & Grounds", "beans", "dark", "18000.00", None, False, False, "Bold, earthy and full-bodied with a syrupy finish.", "Indonesia"),
+            ("Classic Espresso", "Espresso & Coffee", "drink", "espresso", "3250.00", None, True, False, "A perfect double shot pulled from our house blend.", None),
+            ("Caramel Latte", "Espresso & Coffee", "drink", "espresso", "4750.00", "5250.00", True, False, "Silky steamed milk, espresso and house caramel.", None),
+            ("Vanilla Cappuccino", "Espresso & Coffee", "drink", "espresso", "4500.00", None, False, False, "Espresso topped with velvety microfoam and vanilla.", None),
+            ("Flat White", "Espresso & Coffee", "drink", "espresso", "4600.00", None, True, False, "Ristretto shots with silky steamed milk.", None),
+            ("Mocha Bliss", "Espresso & Coffee", "drink", "espresso", "5000.00", None, False, True, "Espresso, chocolate and cream — pure indulgence.", None),
+            ("Vanilla Cold Brew", "Cold Brew", "drink", "espresso", "4950.00", None, True, False, "18-hour steeped cold brew with a touch of vanilla.", None),
+            ("Salted Caramel Cold Brew", "Cold Brew", "drink", "espresso", "5250.00", "5750.00", False, False, "Cold brew swirled with salted caramel and cream.", None),
+            ("Nitro Cold Brew", "Cold Brew", "drink", "espresso", "5500.00", None, True, True, "Nitrogen-infused for a cascading, creamy pour.", None),
+            ("Spiced Chai Latte", "Tea & Chai", "drink", "na", "4400.00", None, False, False, "Aromatic masala chai with steamed milk.", None),
+            ("Matcha Latte", "Tea & Chai", "drink", "na", "4900.00", None, False, True, "Ceremonial-grade matcha whisked with milk.", None),
+            ("Butter Croissant", "Bakery & Food", "food", "na", "3500.00", None, False, False, "Flaky, buttery and baked fresh daily.", None),
+            ("Almond Biscotti", "Bakery & Food", "food", "na", "2750.00", None, False, False, "Crunchy twice-baked biscotti — perfect with coffee.", None),
+            ("Avocado Toast", "Bakery & Food", "food", "na", "7500.00", None, False, False, "Sourdough, smashed avocado, chili flakes and lime.", None),
+            ("Coffee Bliss Ceramic Mug", "Merchandise", "merch", "na", "14000.00", None, False, False, "A 12oz hand-glazed ceramic mug in Cream.", None),
+            ("Insulated Travel Tumbler", "Merchandise", "merch", "na", "24000.00", "28000.00", True, False, "Keeps drinks hot for 6 hours. Because you deserve it.", None),
         ]
         products = []
         for (name, cat, kind, roast, price, compare, featured, new, desc, origin) in catalog:
@@ -234,11 +245,11 @@ class Command(BaseCommand):
 
     def _plans(self):
         data = [
-            ("Bean Curious", "A gentle intro to great coffee", "9.00", "monthly", 1, False,
+            ("Bean Curious", "A gentle intro to great coffee", "9000.00", "monthly", 1, False,
              "1 bag (250g) monthly\nFree delivery\nRoaster's choice\nPause anytime"),
-            ("True Brew", "Our most popular subscription", "24.00", "biweekly", 2, True,
+            ("True Brew", "Our most popular subscription", "24000.00", "biweekly", 2, True,
              "2 bags (500g) every 2 weeks\nFree priority delivery\nChoose your roast\n10% off extras\nMembers-only beans"),
-            ("Daily Ritual", "For the serious coffee lover", "39.00", "weekly", 2, False,
+            ("Daily Ritual", "For the serious coffee lover", "39000.00", "weekly", 2, False,
              "2 bags (500g) weekly\nFree priority delivery\nPersonal roast profile\n20% off extras\nExclusive events"),
         ]
         for name, tagline, price, interval, bags, popular, perks in data:
@@ -259,7 +270,7 @@ class Command(BaseCommand):
         now = timezone.now()
         coupons = [
             ("WELCOME10", "10% off your first order", "percent", "10", "0"),
-            ("BLISS5", "$5 off orders over $25", "fixed", "5", "25"),
+            ("BLISS5", "₦5,000 off orders over ₦25,000", "fixed", "5000", "25000"),
             ("BEANS20", "20% off beans", "percent", "20", "0"),
         ]
         for code, desc, dtype, value, minimum in coupons:
@@ -454,24 +465,24 @@ class Command(BaseCommand):
 
         ingredients_data = [
             # (name, sku, unit, stock, reorder, par, cost, supplier_idx)
-            ("House Blend Beans", "BEAN-HB", "g", 42000, 8000, 40000, "0.0180", 0),
-            ("Espresso Roast Beans", "BEAN-ES", "g", 26000, 6000, 30000, "0.0195", 0),
-            ("Decaf Beans", "BEAN-DC", "g", 4200, 3000, 12000, "0.0210", 0),
-            ("Whole Milk", "MILK-WH", "ml", 31000, 10000, 40000, "0.0011", 1),
-            ("Oat Milk", "MILK-OT", "ml", 8600, 8000, 30000, "0.0024", 1),
-            ("Vanilla Syrup", "SYR-VN", "ml", 5400, 2000, 8000, "0.0052", 2),
-            ("Caramel Syrup", "SYR-CR", "ml", 1800, 2000, 8000, "0.0055", 2),
-            ("Salted Caramel Syrup", "SYR-SC", "ml", 900, 1500, 6000, "0.0060", 2),
-            ("Matcha Powder", "PWD-MT", "g", 1200, 500, 2000, "0.0950", 2),
-            ("Chai Concentrate", "CNC-CH", "ml", 3600, 1500, 6000, "0.0040", 2),
-            ("Cocoa Powder", "PWD-CC", "g", 2400, 800, 3000, "0.0120", 2),
-            ("Butter", "DAI-BT", "g", 5200, 3000, 10000, "0.0075", 1),
-            ("Croissant Dough", "BAK-CR", "ea", 48, 24, 120, "0.6500", 3),
-            ("Sourdough Bread", "BAK-SD", "ea", 22, 20, 60, "1.2000", 3),
-            ("Avocado", "FRH-AV", "ea", 36, 24, 80, "0.9000", 3),
-            ("12oz Paper Cups", "PKG-C12", "ea", 620, 500, 2000, "0.0800", 3),
-            ("16oz Paper Cups", "PKG-C16", "ea", 480, 500, 2000, "0.0950", 3),
-            ("Cup Lids", "PKG-LID", "ea", 1450, 600, 2500, "0.0300", 3),
+            ("House Blend Beans", "BEAN-HB", "g", 42000, 8000, 40000, "18.0000", 0),
+            ("Espresso Roast Beans", "BEAN-ES", "g", 26000, 6000, 30000, "19.5000", 0),
+            ("Decaf Beans", "BEAN-DC", "g", 4200, 3000, 12000, "21.0000", 0),
+            ("Whole Milk", "MILK-WH", "ml", 31000, 10000, 40000, "1.1000", 1),
+            ("Oat Milk", "MILK-OT", "ml", 8600, 8000, 30000, "2.4000", 1),
+            ("Vanilla Syrup", "SYR-VN", "ml", 5400, 2000, 8000, "5.2000", 2),
+            ("Caramel Syrup", "SYR-CR", "ml", 1800, 2000, 8000, "5.5000", 2),
+            ("Salted Caramel Syrup", "SYR-SC", "ml", 900, 1500, 6000, "6.0000", 2),
+            ("Matcha Powder", "PWD-MT", "g", 1200, 500, 2000, "95.0000", 2),
+            ("Chai Concentrate", "CNC-CH", "ml", 3600, 1500, 6000, "4.0000", 2),
+            ("Cocoa Powder", "PWD-CC", "g", 2400, 800, 3000, "12.0000", 2),
+            ("Butter", "DAI-BT", "g", 5200, 3000, 10000, "7.5000", 1),
+            ("Croissant Dough", "BAK-CR", "ea", 48, 24, 120, "650.0000", 3),
+            ("Sourdough Bread", "BAK-SD", "ea", 22, 20, 60, "1200.0000", 3),
+            ("Avocado", "FRH-AV", "ea", 36, 24, 80, "900.0000", 3),
+            ("12oz Paper Cups", "PKG-C12", "ea", 620, 500, 2000, "80.0000", 3),
+            ("16oz Paper Cups", "PKG-C16", "ea", 480, 500, 2000, "95.0000", 3),
+            ("Cup Lids", "PKG-LID", "ea", 1450, 600, 2500, "30.0000", 3),
         ]
         ingredients = {}
         for (name, sku, unit, stock, reorder, par, cost, s_idx) in ingredients_data:
