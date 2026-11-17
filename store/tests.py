@@ -4,7 +4,14 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import User
-from store.models import BaristaNote, BrewGuide, BrewStep, Category, Product
+from store.models import (
+    BaristaNote,
+    BrewGuide,
+    BrewStep,
+    Category,
+    Product,
+    SubscriptionPlan,
+)
 
 
 class StoreViewTests(TestCase):
@@ -96,3 +103,35 @@ class BrewGuideTests(TestCase):
         self.guide.save(update_fields=["is_published"])
         response = self.client.get(self.product.get_absolute_url())
         self.assertNotContains(response, "Everyday pour-over")
+
+
+class SubscriptionPlanTests(TestCase):
+    def test_feature_sections_group_perks(self):
+        plan = SubscriptionPlan.objects.create(
+            name="Bean Curious",
+            price=Decimal("9000.00"),
+            interval=SubscriptionPlan.Interval.MONTHLY,
+            bags_per_delivery=1,
+            perks="1 bag (250g) monthly\nFree delivery\nPause anytime",
+        )
+        sections = {item["title"]: item["perks"] for item in plan.feature_sections}
+        self.assertEqual(sections["In your box"], ["1 bag (250g) monthly"])
+        self.assertEqual(sections["Delivery & service"], ["Free delivery"])
+        self.assertEqual(sections["Member benefits"], ["Pause anytime"])
+
+    def test_subscriptions_page_shows_sectioned_plans(self):
+        SubscriptionPlan.objects.create(
+            name="True Brew",
+            tagline="Our most popular subscription",
+            price=Decimal("24000.00"),
+            interval=SubscriptionPlan.Interval.BIWEEKLY,
+            bags_per_delivery=2,
+            perks="2 bags (500g) every 2 weeks\nFree priority delivery\nChoose your roast",
+            is_popular=True,
+        )
+        response = self.client.get(reverse("store:subscriptions"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Plan 01")
+        self.assertContains(response, "True Brew")
+        self.assertContains(response, "In your box")
+        self.assertContains(response, "Free priority delivery")

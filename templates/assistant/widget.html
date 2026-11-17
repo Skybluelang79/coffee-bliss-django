@@ -1,0 +1,37 @@
+<div class="ai-widget"
+     data-assistant
+     data-surface="{{ surface }}"
+     data-endpoint="{% if surface == 'staff' %}{% url 'assistant:staff_chat' %}{% else %}{% url 'assistant:customer_chat' %}{% endif %}"
+     data-reset-url="{% if surface == 'staff' %}{% url 'assistant:staff_reset' %}{% else %}{% url 'assistant:customer_reset' %}{% endif %}"
+     data-welcome="{{ welcome }}">
+  <button class="ai-launcher" type="button" data-ai-toggle aria-expanded="false" aria-controls="ai-panel-{{ surface }}">
+    <span class="ai-launcher-icon" aria-hidden="true">☕</span>
+    <span class="ai-launcher-label">{{ title }}</span>
+  </button>
+
+  <section class="ai-panel" id="ai-panel-{{ surface }}" data-ai-panel hidden aria-label="{{ title }}">
+    <header class="ai-head">
+      <div class="ai-head-copy">
+        <strong>{{ title }}</strong>
+        <span class="ai-sub">Coffee Bliss AI</span>
+      </div>
+      <div class="ai-head-actions">
+        <button type="button" data-ai-reset title="Start a new chat" aria-label="Start a new chat">↺</button>
+        <button type="button" data-ai-close title="Close" aria-label="Close assistant">✕</button>
+      </div>
+    </header>
+
+    <div class="ai-messages" data-ai-messages role="log" aria-live="polite">
+      <div class="ai-msg ai-msg-bot">{{ welcome }}</div>
+    </div>
+
+    <form class="ai-form" data-ai-form>
+      {% csrf_token %}
+      <label class="sr-only" for="ai-input-{{ surface }}">Ask the assistant</label>
+      <textarea id="ai-input-{{ surface }}" data-ai-input rows="1" maxlength="1000"
+                placeholder="{% if surface == 'staff' %}Ask about orders, stock or sales…{% else %}Ask about the menu, delivery, orders or Coffee Club…{% endif %}" required></textarea>
+      <button class="btn btn-sm" type="submit" data-ai-send>Send</button>
+    </form>
+    <p class="ai-foot">AI can make mistakes. Check important details.</p>
+  </section>
+</div>

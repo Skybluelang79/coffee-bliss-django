@@ -23,6 +23,7 @@ urlpatterns = [
     path("dashboard/", include("dashboard.urls")),
     path("inventory/", include("inventory.urls")),
     path("api/", include("api.urls")),
+    path("assistant/", include("assistant.urls")),
 ]
 
 if settings.DEBUG:

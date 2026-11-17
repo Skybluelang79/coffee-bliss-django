@@ -20,6 +20,15 @@ def site_context(request):
 
         cart = Cart(request)
 
+    user = getattr(request, "user", None)
+    namespace = getattr(getattr(request, "resolver_match", None), "namespace", "")
+    staff_area = bool(
+        user
+        and user.is_authenticated
+        and getattr(user, "is_staff_member", False)
+        and namespace in {"dashboard", "inventory"}
+    )
+
     return {
         "SITE_NAME": settings.SITE_NAME,
         "DEBUG": settings.DEBUG,
@@ -31,4 +40,6 @@ def site_context(request):
         "cart_count": len(cart) if cart else 0,
         "free_delivery_threshold": settings.FREE_DELIVERY_THRESHOLD,
         "current_year": timezone.now().year,
+        "ai_assistant_enabled": bool(getattr(settings, "AI_ENABLED", True)),
+        "assistant_surface": "staff" if staff_area else "customer",
     }

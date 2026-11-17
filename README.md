@@ -21,6 +21,8 @@ rewards, subscriptions, reservations and a REST API.
 - **Checkout** for pickup, delivery or dine-in with **Stripe card payments** (or cash).
 - **Order tracking** with a live status timeline and email notifications.
 - **Loyalty program** — earn beans on every order & review, redeem at checkout.
+- **AI assistant (Bean)** — customer chat on every page and an operations assistant in
+  staff dashboards, both grounded in live shop data with an offline fallback.
 - **Table reservations**, **Coffee Club subscriptions**, **favourites**, **blog/journal**,
   **reviews**, **newsletter** and **contact**.
 
@@ -106,7 +108,8 @@ floating beans). No product image is rendered in the hero itself.
 |-----|-------------|
 | `/` | 3D landing page |
 | `/menu/` | Full product catalogue with filters |
-| `/subscriptions/` | Coffee Club plans |
+| `/subscriptions/` | Coffee Club plans (sectioned plan guide) |
+| `/assistant/chat/` `/assistant/staff/chat/` | AI assistant JSON endpoints (POST) |
 | `/orders/cart/` | Shopping cart |
 | `/orders/checkout/` | Checkout |
 | `/orders/payment/<number>/` | Card payment (Stripe / simulated) |
@@ -154,8 +157,9 @@ coffee-bliss/
 ├── inventory/       # ingredients, suppliers, recipes, stock ledger
 ├── dashboard/       # staff + manager/admin dashboards, KDS
 ├── api/             # DRF serializers, viewsets, auth & cart endpoints
+├── assistant/       # AI chat endpoints, live context, local fallback
 ├── templates/       # all HTML templates
-├── static/          # css, js (hero3d.js), images
+├── static/          # css, js (main.js, assistant.js, hero3d.js), images
 └── manage.py
 ```
 
@@ -171,6 +175,21 @@ All settings are environment-driven (see `.env.example`). Key knobs:
 - `SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`
 - `STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CURRENCY`
 - `KDS_ENABLED`, `CHANNEL_LAYER_BACKEND`, `CHANNEL_LAYER_HOSTS`
+- `AI_ENABLED`, `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`, `AI_TIMEOUT`,
+  `AI_MAX_TOKENS`, `AI_TEMPERATURE`, `AI_MAX_HISTORY`, `AI_RATE_LIMIT`
+
+### 🤖 AI assistant
+
+The floating **Bean** widget is on every customer page; staff dashboards get an
+operations variant. Both endpoints accept `POST {"message": "..."}` with the
+session CSRF token and return `{reply, source, configured}`. Conversations are
+kept in the session (capped by `AI_MAX_HISTORY`) and rate-limited per surface.
+
+With no `AI_API_KEY` the assistant answers from an offline, database-backed
+responder, so it works out of the box. Set `AI_API_KEY` (and optionally
+`AI_BASE_URL` / `AI_MODEL`) to use any OpenAI-compatible chat completions API;
+failed calls fall back to the local responder automatically. Set
+`AI_ENABLED=False` to hide both widgets and disable the endpoints' AI path.
 
 ### 💳 Payments
 
@@ -202,7 +221,8 @@ python manage.py test
 
 Covers storefront views, cart & checkout, coupon application, loyalty accrual,
 account signup/login, role-based dashboard access, the API, inventory consumption &
-restoration, simulated payments & refunds, and the kitchen WebSocket consumer.
+restoration, simulated payments & refunds, the kitchen WebSocket consumer, and the
+AI assistant endpoints (authentication, rate limiting and offline replies).
 
 ---
 

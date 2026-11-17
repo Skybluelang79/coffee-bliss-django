@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load humanize %}
 {% block title %}Coffee Club — {{ SITE_NAME }}{% endblock %}
 {% block content %}
 <section class="block" style="padding-top:2.5rem">
@@ -7,26 +6,59 @@
     <span class="eyebrow">The Coffee Club</span>
     <h1>Fresh coffee, <span class="gradient-text">on repeat</span></h1>
     <p class="lead">Choose a plan, pick your grind, and we'll roast and ship your beans at the perfect moment. Pause or cancel anytime.</p>
-    <div class="grid grid-3 mt-3">
-      {% for plan in plans %}
-        <div class="card plan reveal {% if plan.is_popular %}popular{% endif %}">
-          <span class="eyebrow">{{ plan.get_interval_display }}</span>
-          <h3>{{ plan.name }}</h3>
-          <p class="small">{{ plan.tagline }}</p>
-          <div class="amount">{{ currency_symbol }}{{ plan.price|floatformat:2 }}<span class="muted" style="font-size:1rem">/{{ plan.interval }}</span></div>
-          <p class="small">{{ plan.bags_per_delivery }} bag{{ plan.bags_per_delivery|pluralize }} per delivery</p>
-          <ul>{% for perk in plan.perk_list %}<li>{{ perk }}</li>{% endfor %}</ul>
-          {% if user.is_authenticated %}
-            <a href="{% url 'store:contact' %}" class="btn {% if not plan.is_popular %}btn-ghost{% endif %} btn-block">Subscribe</a>
-          {% else %}
-            <a href="{% url 'accounts:signup' %}" class="btn {% if not plan.is_popular %}btn-ghost{% endif %} btn-block">Join to subscribe</a>
-          {% endif %}
+
+    {% if plans %}
+      <nav class="plan-jump" aria-label="Jump to a Coffee Club plan">
+        {% for plan in plans %}
+          <a href="#{{ plan.slug }}"><span>{{ forloop.counter|stringformat:"02d" }}</span> {{ plan.name }}</a>
+        {% endfor %}
+      </nav>
+    {% endif %}
+  </div>
+</section>
+
+{% for plan in plans %}
+  <section class="plan-section {% cycle '' 'reverse' %} {% if plan.is_popular %}featured{% endif %}" id="{{ plan.slug }}">
+    <div class="container plan-section-grid">
+      <div class="plan-section-intro reveal">
+        <span class="eyebrow">Plan {{ forloop.counter|stringformat:"02d" }} · {{ plan.get_interval_display }}</span>
+        {% if plan.is_popular %}<span class="plan-badge">Most popular</span>{% endif %}
+        <h2>{{ plan.name }}</h2>
+        <p class="lead">{{ plan.tagline }}</p>
+        <div class="plan-section-price">
+          <strong>{{ currency_symbol }}{{ plan.price|floatformat:2 }}</strong>
+          <span>/ {{ plan.get_interval_display|lower }}</span>
         </div>
-      {% empty %}
-        <p class="muted">Plans coming soon.</p>
-      {% endfor %}
+        <p class="small muted">{{ plan.bags_per_delivery }} bag{{ plan.bags_per_delivery|pluralize }} per delivery</p>
+        {% if user.is_authenticated %}
+          <a href="{% url 'store:contact' %}?plan={{ plan.slug }}" class="btn">Join to subscribe</a>
+        {% else %}
+          <a href="{% url 'accounts:signup' %}?plan={{ plan.slug }}" class="btn">Join to subscribe</a>
+        {% endif %}
+        <p class="small muted mt-2">No commitment — pause, skip or cancel whenever you like.</p>
+      </div>
+
+      <div class="plan-section-features reveal">
+        {% for section in plan.feature_sections %}
+          <div class="plan-feature-group">
+            <h3><span aria-hidden="true">☕</span> {{ section.title }}</h3>
+            <ul>
+              {% for perk in section.perks %}<li>{{ perk }}</li>{% endfor %}
+            </ul>
+          </div>
+        {% empty %}
+          <p class="muted">Plan details coming soon.</p>
+        {% endfor %}
+      </div>
     </div>
-    <div class="card panel mt-4 reveal">
+  </section>
+{% empty %}
+  <section class="block"><div class="container"><p class="muted">Plans coming soon.</p></div></section>
+{% endfor %}
+
+<section class="block">
+  <div class="container">
+    <div class="card panel reveal">
       <h3>How it works</h3>
       <div class="grid grid-3 mt-2">
         <div><h3 class="gradient-text">01</h3><p class="small">Pick your favourite plan and how often you want delivery.</p></div>

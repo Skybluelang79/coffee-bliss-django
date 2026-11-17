@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "inventory",
     "dashboard",
     "api",
+    "assistant",
 ]
 
 MIDDLEWARE = [
@@ -188,6 +189,21 @@ STRIPE_CURRENCY = env("STRIPE_CURRENCY", default="ngn")
 PAYSTACK_PUBLIC_KEY = env("PAYSTACK_PUBLIC_KEY", default="")
 PAYSTACK_SECRET_KEY = env("PAYSTACK_SECRET_KEY", default="")
 PAYSTACK_CURRENCY = env("PAYSTACK_CURRENCY", default=CURRENCY_CODE)
+
+# AI assistant (OpenAI-compatible chat completions API). With no API key the
+# assistant falls back to a local, database-backed responder.
+AI_ENABLED = env.bool("AI_ENABLED", default=True)
+AI_API_KEY = env("AI_API_KEY", default="") or env("OPENAI_API_KEY", default="")
+AI_BASE_URL = env("AI_BASE_URL", default="") or env(
+    "OPENAI_BASE_URL", default="https://api.openai.com/v1"
+)
+AI_MODEL = env("AI_MODEL", default="gpt-4o-mini")
+AI_TIMEOUT = env.int("AI_TIMEOUT", default=25)
+AI_MAX_TOKENS = env.int("AI_MAX_TOKENS", default=450)
+AI_TEMPERATURE = env.float("AI_TEMPERATURE", default=0.4)
+AI_MAX_HISTORY = env.int("AI_MAX_HISTORY", default=12)
+AI_RATE_LIMIT = env.int("AI_RATE_LIMIT", default=20)
+AI_RATE_WINDOW_MINUTES = env.int("AI_RATE_WINDOW_MINUTES", default=10)
 
 # Kitchen display system
 KDS_ENABLED = env.bool("KDS_ENABLED", default=True)

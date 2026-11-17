@@ -371,6 +371,26 @@ class SubscriptionPlan(TimeStampedModel):
     def perk_list(self):
         return [p.strip() for p in self.perks.splitlines() if p.strip()]
 
+    @property
+    def feature_sections(self):
+        sections = [
+            ("In your box", []),
+            ("Delivery & service", []),
+            ("Member benefits", []),
+        ]
+        for perk in self.perk_list:
+            text = perk.lower()
+            if any(word in text for word in ("bag", "roast", "bean", "250g", "500g")):
+                index = 0
+            elif any(word in text for word in ("delivery", "ship", "priority")):
+                index = 1
+            else:
+                index = 2
+            sections[index][1].append(perk)
+        return [
+            {"title": title, "perks": perks} for title, perks in sections if perks
+        ]
+
 
 class BlogPost(TimeStampedModel):
     title = models.CharField(max_length=200)
