@@ -1,15 +1,9 @@
 from django.conf import settings
 from django.utils import timezone
 
-from .models import Category, Coupon, StoreLocation
+from accounts.demo import DEMO_LOGINS
 
-# Credentials created by the ``seed`` management command. Only ever exposed to
-# templates when DEBUG is on, for quick sign-in during local development.
-DEMO_LOGINS = [
-    {"label": "Admin", "email": "admin@coffeebliss.test", "password": "admin12345"},
-    {"label": "Staff", "email": "staff@coffeebliss.test", "password": "staff12345"},
-    {"label": "Customer", "email": "customer1@example.com", "password": "demo12345"},
-]
+from .models import Category, Coupon, StoreLocation
 
 
 def site_context(request):

@@ -138,6 +138,7 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "accounts.User"
+AUTHENTICATION_BACKENDS = ["accounts.backends.EmailModelBackend"]
 
 LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "accounts:dashboard"

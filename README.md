@@ -93,6 +93,11 @@ Open <http://127.0.0.1:8000/> 🎉
 | Staff         | `staff@coffeebliss.test`    | `staff12345` |
 | Customer      | `customer1@example.com`     | `demo12345`  |
 
+Email sign-in is case-insensitive. On a demo deployment where the database may
+already exist, run `python manage.py bootstrap_demo_accounts` with
+`BOOTSTRAP_DEMO_ACCOUNTS=1` to create or repair these logins without reloading
+the catalogue. `python manage.py seed` also repairs them automatically.
+
 ---
 
 ## 🖼️ Front-page hero

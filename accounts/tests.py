@@ -1,6 +1,9 @@
+import os
+from io import StringIO
 from unittest import mock
 
 from django.core import mail
+from django.core.management import CommandError, call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -30,6 +33,10 @@ class AccountTests(TestCase):
     def test_login_with_email(self):
         User.objects.create_user(email="x@example.com", password="testpass123")
         self.assertTrue(self.client.login(email="x@example.com", password="testpass123"))
+
+    def test_login_with_email_is_case_insensitive(self):
+        User.objects.create_user(email="x@example.com", password="testpass123")
+        self.assertTrue(self.client.login(email="X@Example.COM", password="testpass123"))
 
     def test_signup_rejects_duplicate_email(self):
         User.objects.create_user(email="ada@example.com", password="testpass123")
@@ -226,3 +233,91 @@ class TwoFactorTests(TestCase):
         self.assertEqual(
             self.client.get(reverse("accounts:dashboard")).status_code, 200
         )
+
+
+class BootstrapAdminTests(TestCase):
+    @mock.patch.dict(
+        os.environ,
+        {
+            "DJANGO_SUPERUSER_EMAIL": "Owner@Example.com",
+            "DJANGO_SUPERUSER_PASSWORD": "strong-bootstrap-pass",
+        },
+    )
+    def test_creates_admin_from_environment(self):
+        call_command("bootstrap_admin", verbosity=0)
+        user = User.objects.get(email="owner@example.com")
+        self.assertEqual(user.role, User.Role.ADMIN)
+        self.assertTrue(user.is_staff)
+        self.assertTrue(user.is_superuser)
+        self.assertTrue(user.check_password("strong-bootstrap-pass"))
+
+    @mock.patch.dict(
+        os.environ,
+        {
+            "DJANGO_SUPERUSER_EMAIL": "existing@example.com",
+            "DJANGO_SUPERUSER_PASSWORD": "new-pass",
+        },
+    )
+    def test_existing_account_password_is_not_overwritten(self):
+        User.objects.create_user(
+            email="existing@example.com", password="original-pass"
+        )
+        call_command("bootstrap_admin", verbosity=0)
+        user = User.objects.get(email="existing@example.com")
+        self.assertTrue(user.check_password("original-pass"))
+        self.assertTrue(user.is_superuser)
+
+
+class AdminLoginTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="owner@example.com", password="StrongAdmin!2026"
+        )
+
+    def test_admin_login_accepts_email_in_any_case(self):
+        response = self.client.post(
+            reverse("admin:login"),
+            {
+                "username": "OWNER@EXAMPLE.COM",
+                "password": "StrongAdmin!2026",
+                "next": reverse("admin:index"),
+            },
+        )
+        self.assertRedirects(response, reverse("admin:index"), fetch_redirect_response=False)
+        self.assertEqual(int(self.client.session["_auth_user_id"]), self.admin.pk)
+
+
+class BootstrapDemoAccountsTests(TestCase):
+    @mock.patch.dict(os.environ, {"BOOTSTRAP_DEMO_ACCOUNTS": "1"})
+    def test_repairs_existing_demo_accounts(self):
+        admin = User.objects.create_user(
+            email="admin@coffeebliss.test",
+            password="stale-password",
+            role=User.Role.CUSTOMER,
+            is_staff=False,
+            is_superuser=False,
+        )
+        customer = User.objects.create_user(
+            email="customer1@example.com", password="stale-password"
+        )
+
+        call_command("bootstrap_demo_accounts", verbosity=0, stdout=StringIO())
+
+        admin.refresh_from_db()
+        customer.refresh_from_db()
+        self.assertTrue(admin.check_password("admin12345"))
+        self.assertEqual(admin.role, User.Role.ADMIN)
+        self.assertTrue(admin.is_staff)
+        self.assertTrue(admin.is_superuser)
+        self.assertTrue(customer.check_password("demo12345"))
+        self.assertTrue(
+            self.client.login(email="ADMIN@COFFEEBLISS.TEST", password="admin12345")
+        )
+
+    @mock.patch.dict(
+        os.environ,
+        {"BOOTSTRAP_DEMO_ACCOUNTS": "0", "SEED_DEMO_DATA": "0"},
+    )
+    def test_refuses_without_opt_in(self):
+        with self.assertRaises(CommandError):
+            call_command("bootstrap_demo_accounts", verbosity=0, stdout=StringIO())

@@ -5,10 +5,15 @@
 1. Merge to `main`; GitHub Actions runs lint, migration check and the test suite.
 2. Render auto-deploys the `coffee-bliss` web service from `render.yaml`.
    To force a specific commit: `render deploys create <service-id> --commit <sha> --wait --confirm`.
-3. `build.sh` installs dependencies, collects static files and migrates. Demo
-   data is never seeded automatically; set `SEED_DEMO_DATA=1` explicitly only
-   for throwaway environments.
-4. Confirm `/healthz/` returns `{"status": "ok", "database": "ok"}`.
+3. `build.sh` installs dependencies, collects static files and migrates. Full
+   demo data is never seeded automatically; set `SEED_DEMO_DATA=1` explicitly
+   only for throwaway environments.
+4. `BOOTSTRAP_DEMO_ACCOUNTS=1` creates or repairs the documented demo logins
+   without adding catalogue/orders. Disable it outside demo deployments.
+5. To bootstrap a real administrator, set `DJANGO_SUPERUSER_EMAIL` and
+   `DJANGO_SUPERUSER_PASSWORD` in the service environment. `build.sh` creates
+   the account if it does not exist; existing passwords are not overwritten.
+6. Confirm `/healthz/` returns `{"status": "ok", "database": "ok"}`.
 
 ## Configuration
 

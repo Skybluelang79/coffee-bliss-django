@@ -13,7 +13,8 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
-from accounts.models import Address, LoyaltyTransaction, User
+from accounts.demo import ensure_demo_accounts
+from accounts.models import User
 from inventory.models import Ingredient, RecipeItem, StockMovement, Supplier
 from orders.models import (
     Order,
@@ -103,63 +104,7 @@ class Command(BaseCommand):
         )
 
     def _users(self):
-        admin, created = User.objects.get_or_create(
-            email="admin@coffeebliss.test",
-            defaults={
-                "first_name": "Ada",
-                "last_name": "Bliss",
-                "role": User.Role.ADMIN,
-                "is_staff": True,
-                "is_superuser": True,
-                "loyalty_points": 0,
-            },
-        )
-        if created:
-            admin.set_password("admin12345")
-            admin.save()
-
-        staff, created = User.objects.get_or_create(
-            email="staff@coffeebliss.test",
-            defaults={
-                "first_name": "Sam",
-                "last_name": "Barista",
-                "role": User.Role.STAFF,
-                "is_staff": True,
-            },
-        )
-        if created:
-            staff.set_password("staff12345")
-            staff.save()
-
-        for i in range(1, 9):
-            user, created = User.objects.get_or_create(
-                email=f"customer{i}@example.com",
-                defaults={
-                    "first_name": random.choice(["Mia", "Leo", "Zoe", "Kai", "Ava", "Noah", "Ivy", "Eli"]),
-                    "last_name": random.choice(["Bean", "Roast", "Crema", "Mocha", "Latte"]),
-                    "phone": f"+1 555 0{i:03d}",
-                    "role": User.Role.CUSTOMER,
-                    "loyalty_points": random.randint(50, 800),
-                    "newsletter_opt_in": True,
-                },
-            )
-            if created:
-                user.set_password("demo12345")
-                user.save()
-                Address.objects.create(
-                    user=user,
-                    label="home",
-                    recipient=user.get_full_name(),
-                    line1=f"{random.randint(1, 300)} Roastery Lane",
-                    city=random.choice(["Bean Town", "Roastville", "Crema City"]),
-                    state="CA",
-                    postal_code=f"9{random.randint(1000, 9999)}",
-                    is_default=True,
-                )
-                LoyaltyTransaction.objects.create(
-                    user=user, points=100, reason="signup", note="Welcome bonus"
-                )
-        return admin
+        return ensure_demo_accounts()
 
     def _locations(self):
         data = [
