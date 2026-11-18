@@ -4,11 +4,13 @@ Usage:
     python manage.py seed
 """
 
+import os
 import random
 from datetime import timedelta
 from decimal import Decimal
 
-from django.core.management.base import BaseCommand
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from accounts.models import Address, LoyaltyTransaction, User
@@ -55,6 +57,15 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        demo_enabled = settings.DEBUG or os.environ.get(
+            "SEED_DEMO_DATA", ""
+        ).lower() in {"1", "true", "yes"}
+        if not demo_enabled:
+            raise CommandError(
+                "Refusing to seed demo users and orders while DEBUG=False. "
+                "Set SEED_DEMO_DATA=1 only if you understand the demo credentials "
+                "and want this data in the target environment."
+            )
         if options["flush"]:
             self.stdout.write("Flushing existing catalog & orders…")
             StockMovement.objects.all().delete()

@@ -3,10 +3,12 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.db.models import Avg, Count, Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from .cache import active_plans
 from .forms import ContactForm, NewsletterForm, ReviewForm
 from .models import (
     BlogPost,
@@ -216,7 +218,7 @@ def subscriptions(request):
     return render(
         request,
         "store/subscriptions.html",
-        {"plans": SubscriptionPlan.objects.filter(is_active=True)},
+        {"plans": active_plans()},
     )
 
 
@@ -282,4 +284,57 @@ def about(request):
         request,
         "store/about.html",
         {"locations": StoreLocation.objects.filter(is_active=True)},
+    )
+
+
+LEGAL_PAGES = {
+    "privacy": (
+        "Privacy policy",
+        "How we collect, use and protect your information.",
+        [
+            ("What we collect", "Account details, order history, delivery addresses, payment references and support messages."),
+            ("Why we use it", "To fulfil orders, run Coffee Club, prevent fraud, improve the menu and send updates you opted into."),
+            ("Your choices", "Update preferences in your profile, ask us for a copy of your data, or request deletion where applicable."),
+            ("Cookies", "We use essential session cookies plus optional analytics. You can disable non-essential cookies in your browser."),
+        ],
+    ),
+    "terms": (
+        "Terms of service",
+        "The ground rules for ordering from Coffee Bliss.",
+        [
+            ("Orders", "Prices shown at checkout are final. We may decline or cancel orders where stock or payment cannot be verified."),
+            ("Subscriptions", "Coffee Club plans renew on the interval shown at checkout. Pause, skip or cancel from your dashboard."),
+            ("Accounts", "Keep your password secure and notify us of unauthorised use."),
+            ("Changes", "We may update these terms; the latest version is always posted here."),
+        ],
+    ),
+    "refunds": (
+        "Refunds & cancellations",
+        "What to do if something isn't right.",
+        [
+            ("Damaged or missing items", "Contact us within 48 hours with your order number and we'll make it right."),
+            ("Cancellations", "Orders can be cancelled before preparation begins. Subscription charges already settled are non-refundable, but you can cancel future renewals."),
+            ("How refunds are sent", "Approved refunds return to the original payment method within 5–10 business days."),
+        ],
+    ),
+    "accessibility": (
+        "Accessibility",
+        "Our commitment to a usable site for everyone.",
+        [
+            ("Standards", "We aim for WCAG 2.1 AA: keyboard navigation, visible focus, sufficient contrast and semantic landmarks."),
+            ("Assistive tech", "The AI assistant and forms expose labels and live regions for screen readers."),
+            ("Feedback", "If something is hard to use, email hello@coffeebliss.example and we'll improve it."),
+        ],
+    ),
+}
+
+
+def legal(request, page):
+    if page not in LEGAL_PAGES:
+        raise Http404("Legal page not found")
+    title, intro, sections = LEGAL_PAGES[page]
+    return render(
+        request,
+        "store/legal.html",
+        {"page_title": title, "intro": intro, "sections": sections},
     )

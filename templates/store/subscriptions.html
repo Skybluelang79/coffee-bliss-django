@@ -31,9 +31,9 @@
         </div>
         <p class="small muted">{{ plan.bags_per_delivery }} bag{{ plan.bags_per_delivery|pluralize }} per delivery</p>
         {% if user.is_authenticated %}
-          <a href="{% url 'store:contact' %}?plan={{ plan.slug }}" class="btn">Join to subscribe</a>
+          <a href="{% url 'orders:subscription_start' plan.slug %}" class="btn">Join to subscribe</a>
         {% else %}
-          <a href="{% url 'accounts:signup' %}?plan={{ plan.slug }}" class="btn">Join to subscribe</a>
+          <a href="{% url 'accounts:signup' %}?next={% url 'orders:subscription_start' plan.slug %}" class="btn">Join to subscribe</a>
         {% endif %}
         <p class="small muted mt-2">No commitment — pause, skip or cancel whenever you like.</p>
       </div>

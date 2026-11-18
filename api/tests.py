@@ -39,3 +39,10 @@ class ApiTests(TestCase):
     def test_schema_available(self):
         response = self.client.get("/api/schema/")
         self.assertEqual(response.status_code, 200)
+
+
+class HealthCheckTests(TestCase):
+    def test_healthz_reports_database(self):
+        response = self.client.get(reverse("healthz"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok", "database": "ok"})

@@ -8,7 +8,13 @@ whitenoise>=6.6
 channels>=4.1
 channels-redis>=4.2
 daphne>=4.1
+# Optional scale add-ons (uncomment when configuring Redis/Celery)
+# django-redis>=5.4
+# celery>=5.3
+
 # Payments
 stripe>=9.0
+# Error monitoring (activated when SENTRY_DSN is set)
+sentry-sdk>=2.0
 # Optional production database driver
 # psycopg[binary]>=3.1

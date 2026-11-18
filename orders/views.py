@@ -1,7 +1,10 @@
+import logging
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import F, Q
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -9,7 +12,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from . import payments
+from . import payments, subscription_billing as billing
 from .cart import Cart
 from .forms import CartEmailForm, CheckoutForm, OrderFeedbackForm, ReservationForm
 from .models import (
@@ -20,7 +23,14 @@ from .models import (
     OrderStatusHistory,
     Payment,
     Reservation,
+    Subscription,
+    SubscriptionDelivery,
 )
+
+ALLOWED_SIZES = {"Small", "Medium", "Large"}
+ALLOWED_MILKS = {"Whole", "Oat", "Almond", "Skim"}
+MAX_EXTRAS = 5
+MAX_OPTION_LENGTH = 40
 
 
 def cart_detail(request):
@@ -42,13 +52,18 @@ def cart_add(request, product_id):
     except (TypeError, ValueError):
         quantity = 1
     options = {}
-    size = request.POST.get("size")
-    milk = request.POST.get("milk")
-    extras = request.POST.getlist("extras")
-    if size:
-        options["size"] = size
-    if milk:
-        options["milk"] = milk
+    if product.kind == product.Kind.DRINK:
+        size = request.POST.get("size")
+        milk = request.POST.get("milk")
+        if size in ALLOWED_SIZES:
+            options["size"] = size
+        if milk in ALLOWED_MILKS:
+            options["milk"] = milk
+    extras = []
+    for value in request.POST.getlist("extras")[:MAX_EXTRAS]:
+        value = str(value).strip()[:MAX_OPTION_LENGTH]
+        if value:
+            extras.append(value)
     if extras:
         options["extras"] = extras
     cart.add(product, quantity=quantity, options=options)
@@ -85,12 +100,14 @@ def apply_coupon(request):
     cart = Cart(request)
     code = request.POST.get("code", "").strip()
     coupon = Coupon.objects.filter(code__iexact=code).first()
-    if coupon and coupon.is_valid:
+    if coupon and coupon.can_be_used_by(request.user):
         cart.set_coupon(coupon)
         messages.success(request, f"Promo code {coupon.code} applied!")
     else:
         cart.set_coupon(None)
-        messages.error(request, "That promo code is invalid or expired.")
+        messages.error(
+            request, "That promo code is invalid, expired, or already used."
+        )
     return redirect("orders:cart")
 
 
@@ -154,28 +171,49 @@ def checkout(request):
     if request.method == "POST":
         form = CheckoutForm(request.POST)
         if form.is_valid():
-            order = _create_order(request, cart, form)
-            method = form.cleaned_data.get("payment_method") or "card"
-            cart.clear()
+            coupon_code = form.cleaned_data.get("coupon_code")
+            coupon = None
+            if coupon_code:
+                from store.models import Coupon
 
-            if order.total <= 0:
-                payments.simulate_success(
-                    order, user=request.user if request.user.is_authenticated else None
-                )
-                messages.success(
-                    request,
-                    f"Order {order.number} placed — fully covered by your gift card! ☕",
-                )
-                return redirect("orders:order_confirmation", number=order.number)
+                coupon = Coupon.objects.filter(code__iexact=coupon_code).first()
+                if not coupon or not coupon.can_be_used_by(request.user):
+                    form.add_error(
+                        "coupon_code",
+                        "This promo code is invalid, expired, or already used.",
+                    )
+            if not form.errors:
+                order = _create_order(request, cart, form)
+                method = form.cleaned_data.get("payment_method") or "card"
+                request.session["order_number"] = order.number
+                cart.clear()
 
-            if method == "cash":
-                payments.simulate_success(order, user=request.user if request.user.is_authenticated else None)
-                messages.success(request, f"Order {order.number} placed! Pay on {order.get_fulfillment_display().lower()}.")
-                return redirect("orders:order_confirmation", number=order.number)
+                if order.total <= 0:
+                    payments.simulate_success(
+                        order,
+                        user=request.user if request.user.is_authenticated else None,
+                    )
+                    messages.success(
+                        request,
+                        f"Order {order.number} placed — fully covered by your gift card! ☕",
+                    )
+                    return redirect(
+                        "orders:order_confirmation", number=order.number
+                    )
 
-            # Card: always take the payment step (the demo gateway renders
-            # automatically when no Stripe keys are configured).
-            return redirect("orders:payment", number=order.number)
+                if method == "cash":
+                    messages.success(
+                        request,
+                        f"Order {order.number} placed! Pay on "
+                        f"{order.get_fulfillment_display().lower()}.",
+                    )
+                    return redirect(
+                        "orders:order_confirmation", number=order.number
+                    )
+
+                # Card: always take the payment step (the demo gateway renders
+                # automatically when no Stripe keys are configured).
+                return redirect("orders:payment", number=order.number)
         messages.error(request, "Please fix the highlighted fields.")
     else:
         form = CheckoutForm(initial=initial)
@@ -187,10 +225,15 @@ def checkout(request):
     )
 
 
+@transaction.atomic
 def _create_order(request, cart, form):
     data = form.cleaned_data
+    user = request.user if request.user.is_authenticated else None
+    points_used = min(cart.points_used, user.loyalty_points) if user else 0
+    if user and points_used != cart.points_used:
+        cart.set_points(points_used)
     order = Order(
-        user=request.user if request.user.is_authenticated else None,
+        user=user,
         guest_email="",
         fulfillment=data["fulfillment"],
         location=data.get("location"),
@@ -198,17 +241,21 @@ def _create_order(request, cart, form):
         customer_phone=data.get("customer_phone", ""),
         delivery_address=data.get("delivery_address", ""),
         note=data.get("note", ""),
-        points_used=cart.points_used if request.user.is_authenticated else 0,
-        loyalty_discount=cart.loyalty_discount if request.user.is_authenticated else 0,
+        points_used=points_used if user else 0,
+        loyalty_discount=cart.loyalty_discount if user else 0,
     )
     if data.get("coupon_code"):
         from store.models import Coupon
 
-        order.coupon = Coupon.objects.filter(code__iexact=data["coupon_code"]).first()
+        coupon = Coupon.objects.filter(code__iexact=data["coupon_code"]).first()
+        if coupon and coupon.can_be_used_by(user):
+            order.coupon = coupon
 
     gift_card = cart.get_gift_card()
     if gift_card and gift_card.is_usable:
-        order.gift_card = gift_card
+        gift_card = GiftCard.objects.select_for_update().get(pk=gift_card.pk)
+        if gift_card.is_usable:
+            order.gift_card = gift_card
 
     order.save()
     for line in cart:
@@ -225,6 +272,20 @@ def _create_order(request, cart, form):
     order.notify_email = True
     order.ensure_estimated_ready_at()
 
+    # Consume the coupon under a row lock so concurrent checkouts cannot
+    # exceed max_uses or per_user_limit.
+    if order.coupon_id:
+        from store.models import Coupon
+
+        coupon = Coupon.objects.select_for_update().get(pk=order.coupon_id)
+        if coupon.is_valid and coupon.can_be_used_by(user, exclude_order=order):
+            coupon.used_count += 1
+            coupon.save(update_fields=["used_count"])
+        else:
+            order.coupon = None
+            order = order.recalculate()
+            order.save()
+
     # Redeem the gift card now that the order total is known.
     if order.gift_card_id and order.gift_card_amount:
         applied = order.gift_card.redeem(order.gift_card_amount)
@@ -240,16 +301,10 @@ def _create_order(request, cart, form):
             note=f"Applied to order {order.number}",
         )
 
-    # Redeem loyalty points
-    if order.points_used and request.user.is_authenticated:
-        request.user.add_loyalty_points(-order.points_used, "redemption", order=order)
-
-    # Earn loyalty points
-    if request.user.is_authenticated:
-        earned = int(order.total * settings.LOYALTY_POINTS_PER_DOLLAR)
-        order.points_earned = earned
-        order.save(update_fields=["points_earned"])
-        request.user.add_loyalty_points(earned, "order", order=order)
+    # Reserve redeemed points at checkout. They are returned if the order is
+    # cancelled or fully refunded; new points are awarded only after payment.
+    if order.points_used and user:
+        user.add_loyalty_points(-order.points_used, "redemption", order=order)
 
     # Create a pending payment record; confirmation happens via Stripe/cash.
     payments.get_or_create_payment(order, method=data.get("payment_method", "card"))
@@ -261,18 +316,29 @@ def _create_order(request, cart, form):
         note="Order placed",
     )
 
-    if order.coupon:
-        order.coupon.used_count += 1
-        order.coupon.save(update_fields=["used_count"])
-
     from .recovery import mark_cart_recovered
 
     mark_cart_recovered(request, order)
     return order
 
 
-def payment_page(request, number):
+def _can_access_order(request, order):
+    if request.user.is_authenticated and (
+        order.user_id == request.user.id or request.user.is_staff_member
+    ):
+        return True
+    return str(request.session.get("order_number") or "") == order.number
+
+
+def _order_for_request(request, number):
     order = get_object_or_404(Order.objects.prefetch_related("items"), number=number)
+    if not _can_access_order(request, order):
+        raise Http404("Order not found")
+    return order
+
+
+def payment_page(request, number):
+    order = _order_for_request(request, number)
     if order.payment_status == Order.PaymentStatus.PAID:
         return redirect("orders:order_confirmation", number=order.number)
 
@@ -331,7 +397,7 @@ def payment_page(request, number):
 @require_POST
 def payment_simulate(request, number):
     """Demo gateway: mark a simulated card payment as successful."""
-    order = get_object_or_404(Order, number=number)
+    order = _order_for_request(request, number)
     if not payments.any_provider_configured():
         payments.simulate_success(order, user=request.user if request.user.is_authenticated else None)
         messages.success(request, f"Payment received for order {order.number}.")
@@ -342,7 +408,7 @@ def payment_simulate(request, number):
 @require_POST
 def paystack_initialize(request, number):
     """Create a Paystack transaction and send the customer to its checkout."""
-    order = get_object_or_404(Order, number=number)
+    order = _order_for_request(request, number)
     if order.payment_status == Order.PaymentStatus.PAID:
         return redirect("orders:order_confirmation", number=order.number)
     if not payments.is_paystack_configured():
@@ -409,7 +475,7 @@ def paystack_webhook(request):
 
 
 def order_confirmation(request, number):
-    order = get_object_or_404(Order.objects.prefetch_related("items"), number=number)
+    order = _order_for_request(request, number)
     return render(request, "orders/confirmation.html", {"order": order})
 
 
@@ -534,6 +600,8 @@ def cancel_order(request, number):
     from inventory.services import restore_for_order
 
     restore_for_order(order, user=user)
+    payments.reverse_loyalty(order)
+    payments.release_coupon(order)
     if order.gift_card_id and order.gift_card_amount:
         credited = order.gift_card.credit(order.gift_card_amount)
         GiftCardTransaction.objects.create(
@@ -685,6 +753,7 @@ def reserve(request):
             if request.user.is_authenticated:
                 reservation.user = request.user
             reservation.save()
+            request.session["reservation_pk"] = reservation.pk
             messages.success(
                 request,
                 f"Table requested for {reservation.date} at {reservation.time}. "
@@ -705,7 +774,20 @@ def reserve(request):
 
 def reservation_success(request, pk):
     reservation = get_object_or_404(Reservation, pk=pk)
-    return render(request, "orders/reservation_success.html", {"reservation": reservation})
+    allowed = request.session.get("reservation_pk") == reservation.pk or (
+        request.user.is_authenticated
+        and (
+            reservation.user_id == request.user.id
+            or request.user.is_staff_member
+        )
+    )
+    if not allowed:
+        raise Http404("Reservation not found")
+    return render(
+        request,
+        "orders/reservation_success.html",
+        {"reservation": reservation},
+    )
 
 
 def order_history(request):
@@ -713,3 +795,136 @@ def order_history(request):
         return redirect("accounts:login")
     orders = Order.objects.filter(user=request.user).prefetch_related("items")
     return render(request, "orders/history.html", {"orders": orders})
+
+
+@login_required
+def subscription_start(request, slug):
+    from store.models import SubscriptionPlan
+
+    plan = get_object_or_404(SubscriptionPlan, slug=slug, is_active=True)
+    return render(
+        request,
+        "orders/subscription_start.html",
+        {
+            "plan": plan,
+            "addresses": request.user.addresses.all(),
+            "providers": billing.available_providers(),
+            "grinds": Subscription.Grind.choices,
+            "roasts": Subscription.Roast.choices,
+        },
+    )
+
+
+@login_required
+@require_POST
+def subscription_create(request, slug):
+    from store.models import SubscriptionPlan
+
+    plan = get_object_or_404(SubscriptionPlan, slug=slug, is_active=True)
+    provider = request.POST.get("provider", Subscription.Provider.SIMULATED)
+    if provider not in billing.available_providers():
+        messages.error(request, "Please choose a supported payment provider.")
+        return redirect("orders:subscription_start", slug=slug)
+
+    grind = request.POST.get("grind", Subscription.Grind.WHOLE)
+    roast = request.POST.get("roast", Subscription.Roast.ROASTER)
+    if grind not in dict(Subscription.Grind.choices):
+        grind = Subscription.Grind.WHOLE
+    if roast not in dict(Subscription.Roast.choices):
+        roast = Subscription.Roast.ROASTER
+
+    address = request.user.addresses.filter(pk=request.POST.get("address") or -1).first()
+    subscription = billing.create_subscription(
+        request.user,
+        plan,
+        grind=grind,
+        roast=roast,
+        address=address,
+        provider=provider,
+    )
+    try:
+        checkout_url = billing.start_billing(subscription, request)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Subscription billing failed: %s", exc)
+        messages.error(
+            request,
+            "We couldn't start the subscription. Please try a different payment option.",
+        )
+        subscription.delete()
+        return redirect("orders:subscription_start", slug=slug)
+
+    if checkout_url:
+        return redirect(checkout_url)
+    messages.success(request, f"Welcome to Coffee Club, {plan.name} is active!")
+    return redirect("orders:subscription_manage")
+
+
+@login_required
+def subscription_manage(request):
+    subscriptions = (
+        Subscription.objects.filter(user=request.user)
+        .select_related("plan", "address")
+        .prefetch_related("deliveries")
+    )
+    return render(
+        request,
+        "orders/subscription_manage.html",
+        {"subscriptions": subscriptions},
+    )
+
+
+@login_required
+@require_POST
+def subscription_action(request, pk):
+    subscription = get_object_or_404(Subscription, pk=pk, user=request.user)
+    action = request.POST.get("action")
+    if action == "pause":
+        subscription.pause()
+        messages.info(request, "Subscription paused.")
+    elif action == "resume":
+        subscription.resume()
+        messages.success(request, "Subscription resumed.")
+    elif action == "cancel":
+        subscription.cancel()
+        messages.info(request, "Subscription cancelled.")
+    elif action == "skip":
+        subscription.skip_next_delivery()
+        messages.info(request, "Next delivery skipped.")
+    elif action == "unskip":
+        subscription.skip_next = False
+        subscription.save(update_fields=["skip_next"])
+        messages.success(request, "Next delivery restored.")
+    else:
+        messages.error(request, "Unknown subscription action.")
+    return redirect("orders:subscription_manage")
+
+
+@login_required
+def subscription_return(request):
+    messages.info(
+        request,
+        "Thanks! Your payment is being confirmed — your Coffee Club dashboard "
+        "will update shortly.",
+    )
+    return redirect("orders:subscription_manage")
+
+
+@login_required
+def subscription_paystack_callback(request, pk):
+    subscription = get_object_or_404(Subscription, pk=pk, user=request.user)
+    reference = request.GET.get("reference") or request.GET.get("trxref") or ""
+    delivery = subscription.deliveries.order_by("-scheduled_for").first()
+    order = delivery.order if delivery else None
+    if order and reference:
+        verified, error = payments.verify_paystack_payment(order, reference)
+        if verified:
+            billing.settle_delivery(
+                delivery, reference=reference, user=request.user
+            )
+            messages.success(request, "Coffee Club payment confirmed!")
+        else:
+            messages.error(
+                request,
+                error or "We couldn't confirm that payment. Please try again.",
+            )
+    return redirect("orders:subscription_manage")

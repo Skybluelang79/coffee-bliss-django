@@ -163,7 +163,24 @@ class OrderSerializer(serializers.ModelSerializer):
             "items",
             "placed_at",
         )
-        read_only_fields = ("number", "subtotal", "discount", "tax", "total", "points_earned")
+        read_only_fields = (
+            "number",
+            "status",
+            "payment_status",
+            "fulfillment",
+            "customer_name",
+            "customer_phone",
+            "delivery_address",
+            "subtotal",
+            "discount",
+            "delivery_fee",
+            "tax",
+            "loyalty_discount",
+            "points_used",
+            "points_earned",
+            "total",
+            "placed_at",
+        )
 
 
 class ReservationSerializer(serializers.ModelSerializer):
@@ -210,7 +227,20 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Subscription
-        fields = ("id", "plan", "status", "grind", "next_delivery", "started_at")
+        fields = (
+            "id",
+            "plan",
+            "status",
+            "grind",
+            "roast",
+            "price",
+            "interval",
+            "bags_per_delivery",
+            "provider",
+            "skip_next",
+            "next_delivery",
+            "started_at",
+        )
 
 
 class BlogPostSerializer(serializers.ModelSerializer):

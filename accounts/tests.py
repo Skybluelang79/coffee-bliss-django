@@ -1,6 +1,7 @@
 from unittest import mock
 
-from django.test import TestCase
+from django.core import mail
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .forms import SignUpForm
@@ -199,3 +200,29 @@ class PasswordResetTests(TestCase):
 
         response = self.client.get(link, follow=True)
         self.assertContains(response, "no longer")
+
+
+@override_settings(TWO_FACTOR_ENABLED=True)
+class TwoFactorTests(TestCase):
+    def test_opted_in_account_requires_code(self):
+        user = User.objects.create_user(
+            email="secure@example.com",
+            password="testpass123",
+            two_factor_enabled=True,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("accounts:dashboard"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("2fa/verify/", response["Location"])
+        self.assertEqual(len(mail.outbox), 1)
+
+        code = self.client.session["2fa_code"]
+        verified = self.client.post(
+            reverse("accounts:two_factor_verify"),
+            {"code": code, "next": reverse("accounts:dashboard")},
+        )
+        self.assertEqual(verified.status_code, 302)
+        self.assertEqual(
+            self.client.get(reverse("accounts:dashboard")).status_code, 200
+        )

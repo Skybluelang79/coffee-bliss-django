@@ -144,6 +144,18 @@ def eligible_for_recovery(hours=6, max_reminders=2, now=None):
 
 
 def send_recovery_email(abandoned, site_url=None):
+    """Queue a cart reminder (runs inline when Celery is not configured)."""
+    from config.tasks import delay
+
+    from .tasks import send_recovery_email_task
+
+    if not abandoned.recipient_email:
+        return False
+    delay(send_recovery_email_task, abandoned.pk, site_url=site_url)
+    return True
+
+
+def _send_recovery_email(abandoned, site_url=None):
     """Send a single recovery email. Returns True when an email was sent."""
     email = abandoned.recipient_email
     if not email:

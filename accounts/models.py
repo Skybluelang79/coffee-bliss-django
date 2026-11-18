@@ -60,6 +60,7 @@ class User(AbstractUser):
     newsletter_opt_in = models.BooleanField(default=False)
     marketing_opt_in = models.BooleanField(default=False)
     loyalty_points = models.PositiveIntegerField(default=0)
+    two_factor_enabled = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
 
     USERNAME_FIELD = "email"

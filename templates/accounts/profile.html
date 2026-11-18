@@ -27,6 +27,7 @@
         <div class="field">{{ form.avatar.label_tag }}{{ form.avatar }}</div>
         <label class="flex center gap-sm mb-1"><input type="checkbox" class="form-check" name="newsletter_opt_in" {% if user.newsletter_opt_in %}checked{% endif %} /> Email newsletter</label>
         <label class="flex center gap-sm mb-2"><input type="checkbox" class="form-check" name="marketing_opt_in" {% if user.marketing_opt_in %}checked{% endif %} /> Personalised offers</label>
+        <label class="flex center gap-sm mb-2"><input type="checkbox" class="form-check" name="two_factor_enabled" {% if user.two_factor_enabled %}checked{% endif %} /> Two-factor sign-in (email code)</label>
         <button class="btn">Save changes</button>
       </form>
     </div>

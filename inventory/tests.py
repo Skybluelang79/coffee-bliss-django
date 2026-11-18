@@ -43,7 +43,8 @@ class InventoryServiceTests(TestCase):
     def test_consume_deducts_recipe_ingredients(self):
         order = self._order(qty=2)
         consume_for_order(order)
-        self.beans.refresh_from_db(); self.milk.refresh_from_db()
+        self.beans.refresh_from_db()
+        self.milk.refresh_from_db()
         self.assertEqual(self.beans.stock, Decimal("964"))  # 1000 - 18*2
         self.assertEqual(self.milk.stock, Decimal("4600"))  # 5000 - 200*2
         self.assertTrue(Order.objects.get(pk=order.pk).stock_consumed)

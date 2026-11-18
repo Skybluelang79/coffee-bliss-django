@@ -34,3 +34,13 @@ services:
         value: "https://api.openai.com/v1"
       - key: AI_MODEL
         value: "gpt-4o-mini"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: SENTRY_DSN
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: TWO_FACTOR_ENABLED
+        value: "false"

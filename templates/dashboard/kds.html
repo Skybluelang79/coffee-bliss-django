@@ -110,7 +110,9 @@
       const li = document.createElement("li");
       const opts = it.options && Object.keys(it.options).length
         ? " (" + Object.values(it.options).flat().join(", ") + ")" : "";
-      li.innerHTML = "<b>" + it.quantity + "×</b> " + it.name + opts;
+      const qty = document.createElement("b");
+      qty.textContent = it.quantity + "×";
+      li.append(qty, document.createTextNode(" " + it.name + opts));
       ul.appendChild(li);
     });
     if (o.note) {

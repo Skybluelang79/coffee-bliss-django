@@ -32,6 +32,12 @@
                     </select>
                     <button class="btn btn-sm">Update</button>
                   </form>
+                  {% if order.payment_status != "paid" %}
+                  <form method="post" action="{% url 'dashboard:staff_mark_paid' order.number %}" class="mt-1">
+                    {% csrf_token %}
+                    <button class="btn btn-ghost btn-sm">Mark paid</button>
+                  </form>
+                  {% endif %}
                 </td>
               </tr>
             {% endfor %}

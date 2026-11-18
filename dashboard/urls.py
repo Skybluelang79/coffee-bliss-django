@@ -9,6 +9,7 @@ urlpatterns = [
     path("staff/kds/", views.staff_kds, name="staff_kds"),
     path("staff/orders/", views.staff_orders, name="staff_orders"),
     path("staff/orders/<str:number>/status/", views.staff_update_status, name="staff_update_status"),
+    path("staff/orders/<str:number>/mark-paid/", views.staff_mark_paid, name="staff_mark_paid"),
     path("staff/reservations/", views.staff_reservations, name="staff_reservations"),
     path("staff/reservations/<int:pk>/", views.staff_update_reservation, name="staff_update_reservation"),
     path("admin/", views.admin_home, name="admin_home"),

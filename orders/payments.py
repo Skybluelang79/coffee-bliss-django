@@ -18,7 +18,8 @@ import uuid
 from decimal import Decimal
 
 from django.conf import settings
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import F, Q, Sum
 
 from .models import GiftCardTransaction, Order, OrderStatusHistory, Payment
 
@@ -323,11 +324,46 @@ def create_payment_intent(order: Order, payment: Payment | None = None, force_si
     return {"client_secret": intent.client_secret, "payment_intent_id": intent.id, "simulated": False}
 
 
+def reverse_loyalty(order: Order):
+    """Return redeemed points and remove rewards for a cancelled/refunded order."""
+    if not order.user_id:
+        return
+    user = order.user
+    with transaction.atomic():
+        if order.points_used:
+            user.add_loyalty_points(
+                order.points_used, "adjustment", order=order
+            )
+            order.points_used = 0
+            order.save(update_fields=["points_used"])
+        if order.points_earned:
+            user.add_loyalty_points(
+                -order.points_earned, "adjustment", order=order
+            )
+            order.points_earned = 0
+            order.save(update_fields=["points_earned"])
+
+
+def release_coupon(order: Order):
+    """Give a coupon use back when an order is cancelled or fully refunded."""
+    if not order.coupon_id:
+        return
+    order.coupon.__class__.objects.filter(
+        pk=order.coupon_id, used_count__gt=0
+    ).update(used_count=F("used_count") - 1)
+
+
 def mark_order_paid(order: Order, *, reference: str = "", charge_id: str = "", user=None):
     """Mark an order and its payment as paid, then confirm the order."""
     payment = get_or_create_payment(order)
     if order.payment_status == Order.PaymentStatus.PAID and payment.is_successful:
         # Webhooks and callbacks can both report the same payment.
+        return payment
+    if order.payment_status == Order.PaymentStatus.REFUNDED or order.status in {
+        Order.Status.CANCELLED,
+        Order.Status.REFUNDED,
+    }:
+        logger.warning("Ignoring payment for closed order %s", order.number)
         return payment
     payment.state = Payment.State.SUCCEEDED
     payment.is_successful = True
@@ -347,6 +383,14 @@ def mark_order_paid(order: Order, *, reference: str = "", charge_id: str = "", u
         changed_by=user,
         note="Payment received",
     )
+
+    # Reward points once, at the moment the money is actually collected.
+    if order.user_id and not order.points_earned:
+        earned = int(order.total * settings.LOYALTY_POINTS_PER_DOLLAR)
+        if earned:
+            order.points_earned = earned
+            order.save(update_fields=["points_earned"])
+            order.user.add_loyalty_points(earned, "order", order=order)
 
     # Deduct inventory now that the order is confirmed.
     from inventory.services import consume_for_order
@@ -368,10 +412,14 @@ def refund_order(order: Order, amount: Decimal | None = None, user=None):
     if not payment:
         return False, "No successful payment to refund."
 
-    amount = Decimal(amount) if amount is not None else payment.amount
-    amount = min(amount, payment.amount - payment.refunded_amount)
+    outstanding = payment.amount - payment.refunded_amount
+    amount = Decimal(amount) if amount is not None else outstanding
+    amount = max(Decimal("0.00"), min(amount, outstanding))
+    is_full = amount >= outstanding
+    if amount <= 0 and not is_full:
+        return False, "Refund amount must be greater than zero."
 
-    if payment.paystack_reference:
+    if amount > 0 and payment.paystack_reference:
         if not is_paystack_configured():
             return False, "Paystack is not configured."
         try:
@@ -386,7 +434,7 @@ def refund_order(order: Order, amount: Decimal | None = None, user=None):
         except Exception as exc:
             logger.exception("Paystack refund failed")
             return False, str(exc)
-    elif is_configured() and payment.stripe_payment_intent_id:
+    elif amount > 0 and is_configured() and payment.stripe_payment_intent_id:
         try:
             client = _client()
             client.Refund.create(
@@ -398,25 +446,44 @@ def refund_order(order: Order, amount: Decimal | None = None, user=None):
             return False, str(exc)
 
     payment.refunded_amount = payment.refunded_amount + amount
-    if payment.refunded_amount >= payment.amount:
+    if is_full:
         payment.state = Payment.State.REFUNDED
         payment.is_successful = False
         order.payment_status = Order.PaymentStatus.REFUNDED
+        order.status = Order.Status.REFUNDED
     else:
         order.payment_status = Order.PaymentStatus.PAID
     payment.save()
-    order.status = Order.Status.REFUNDED
     order.save(update_fields=["payment_status", "status", "updated_at"])
 
-    from inventory.services import restore_for_order
+    if is_full:
+        from inventory.services import restore_for_order
 
-    restore_for_order(order, user=user)
+        restore_for_order(order, user=user)
+        reverse_loyalty(order)
+        release_coupon(order)
 
-    # Return the portion of any applied gift card, proportional to the amount
-    # being refunded (a full refund returns the whole gift card contribution).
-    if order.gift_card_id and order.gift_card_amount and payment.amount > 0:
-        fraction = amount / payment.amount
-        credit = (order.gift_card_amount * fraction).quantize(Decimal("0.01"))
+    # Return the portion of any applied gift card. Full refunds restore the
+    # whole contribution, including orders paid entirely by gift card.
+    if order.gift_card_id and order.gift_card_amount:
+        if is_full:
+            target = order.gift_card_amount
+        elif payment.amount > 0:
+            target = (
+                order.gift_card_amount
+                * (payment.refunded_amount / payment.amount)
+            ).quantize(Decimal("0.01"))
+        else:
+            target = Decimal("0.00")
+        already = (
+            GiftCardTransaction.objects.filter(
+                order=order,
+                gift_card=order.gift_card,
+                kind=GiftCardTransaction.Kind.REFUND,
+            ).aggregate(total=Sum("amount"))["total"]
+            or Decimal("0.00")
+        )
+        credit = max(Decimal("0.00"), target - already)
         if credit > 0:
             card = order.gift_card
             credited = card.credit(credit)
@@ -430,8 +497,24 @@ def refund_order(order: Order, amount: Decimal | None = None, user=None):
             )
 
     OrderStatusHistory.objects.create(
-        order=order, status=Order.Status.REFUNDED, changed_by=user, note=f"Refunded {amount}"
+        order=order,
+        status=order.status,
+        changed_by=user,
+        note=f"Refunded {amount}",
     )
+    return True, None
+
+
+def _stripe_payment_matches(order: Order, data: dict) -> tuple[bool, str | None]:
+    try:
+        amount = int(data.get("amount") or 0)
+    except (TypeError, ValueError):
+        return False, "Invalid payment amount."
+    currency = str(data.get("currency") or "").lower()
+    if currency and currency != str(settings.STRIPE_CURRENCY).lower():
+        return False, "Payment currency does not match the order."
+    if amount < _to_minor_units(order.total):
+        return False, "Payment amount is less than the order total."
     return True, None
 
 
@@ -439,17 +522,15 @@ def handle_webhook_event(payload: bytes, sig_header: str):
     """Verify and process a Stripe webhook. Returns (handled: bool, message: str)."""
     if not is_configured():
         return False, "Stripe not configured."
+    if not settings.STRIPE_WEBHOOK_SECRET:
+        logger.error("Stripe webhook secret is not configured; rejecting event.")
+        return False, "Stripe webhook secret is not configured."
 
     client = _client()
     try:
-        if settings.STRIPE_WEBHOOK_SECRET:
-            event = client.Webhook.construct_event(
-                payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
-            )
-        else:
-            import json
-
-            event = json.loads(payload)
+        event = client.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
     except Exception as exc:  # signature verification failed
         logger.warning("Stripe webhook rejected: %s", exc)
         return False, "Invalid signature."
@@ -457,10 +538,22 @@ def handle_webhook_event(payload: bytes, sig_header: str):
     event_type = event["type"] if isinstance(event, dict) else event.type
     data = event["data"]["object"] if isinstance(event, dict) else event.data.object
 
+    if event_type in {"checkout.session.completed", "invoice.paid", "invoice.payment_failed"}:
+        from . import subscription_billing
+
+        return subscription_billing.handle_stripe_subscription_event(event_type, data)
+
     if event_type == "payment_intent.succeeded":
         order_number = (data.get("metadata") or {}).get("order_number")
         order = Order.objects.filter(number=order_number).first()
-        if order and order.payment_status != Order.PaymentStatus.PAID:
+        if order is None:
+            logger.warning("Stripe event for unknown order: %s", order_number)
+            return True, "Unknown order."
+        if order.payment_status != Order.PaymentStatus.PAID:
+            valid, error = _stripe_payment_matches(order, data)
+            if not valid:
+                logger.warning("Stripe webhook rejected: %s", error)
+                return False, error or "Invalid payment."
             charge_id = ""
             charges = data.get("charges", {}).get("data") if data.get("charges") else None
             if charges:
@@ -471,7 +564,7 @@ def handle_webhook_event(payload: bytes, sig_header: str):
     if event_type == "payment_intent.payment_failed":
         order_number = (data.get("metadata") or {}).get("order_number")
         order = Order.objects.filter(number=order_number).first()
-        if order:
+        if order and order.payment_status == Order.PaymentStatus.UNPAID:
             payment = get_or_create_payment(order)
             payment.state = Payment.State.FAILED
             payment.save(update_fields=["state", "updated_at"])
@@ -481,8 +574,37 @@ def handle_webhook_event(payload: bytes, sig_header: str):
         order_number = (data.get("metadata") or {}).get("order_number")
         order = Order.objects.filter(number=order_number).first()
         if order:
-            order.payment_status = Order.PaymentStatus.REFUNDED
-            order.save(update_fields=["payment_status", "updated_at"])
+            payment = order.payments.filter(is_successful=True).first()
+            if payment:
+                try:
+                    refunded = Decimal(data.get("amount_refunded") or 0) / 100
+                except (TypeError, ValueError):
+                    refunded = payment.refunded_amount
+                if refunded > payment.refunded_amount:
+                    previous = payment.refunded_amount
+                    payment.refunded_amount = refunded
+                    is_full = refunded >= payment.amount
+                    if is_full:
+                        payment.state = Payment.State.REFUNDED
+                        payment.is_successful = False
+                        order.payment_status = Order.PaymentStatus.REFUNDED
+                        order.status = Order.Status.REFUNDED
+                        from inventory.services import restore_for_order
+
+                        restore_for_order(order)
+                        reverse_loyalty(order)
+                        release_coupon(order)
+                    else:
+                        order.payment_status = Order.PaymentStatus.PAID
+                    payment.save()
+                    order.save(
+                        update_fields=["payment_status", "status", "updated_at"]
+                    )
+                    OrderStatusHistory.objects.create(
+                        order=order,
+                        status=order.status,
+                        note=f"Stripe refund {refunded - previous}",
+                    )
         return True, "Refund recorded."
 
     return False, f"Unhandled event: {event_type}"

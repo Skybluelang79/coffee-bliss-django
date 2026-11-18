@@ -271,6 +271,26 @@
     }
   });
 
+  // Reusable toast notifications
+  window.coffeeToast = function (message, type) {
+    let container = document.querySelector(".toast-container");
+    if (!container) {
+      container = document.createElement("div");
+      container.className = "toast-container";
+      container.setAttribute("role", "status");
+      container.setAttribute("aria-live", "polite");
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement("div");
+    toast.className = "toast" + (type === "error" ? " toast--error" : type === "info" ? " toast--info" : "");
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.classList.add("is-leaving");
+      setTimeout(() => toast.remove(), 220);
+    }, 4000);
+  };
+
   // Prevent double-submit + show loading state
   document.querySelectorAll("form[data-lock-submit]").forEach((form) => {
     form.addEventListener("submit", () => {

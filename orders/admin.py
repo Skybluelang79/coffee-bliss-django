@@ -17,6 +17,7 @@ from .models import (
     Payment,
     Reservation,
     Subscription,
+    SubscriptionDelivery,
     Table,
 )
 
@@ -100,9 +101,20 @@ class TableAdmin(admin.ModelAdmin):
 
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
-    list_display = ("user", "plan", "status", "grind", "next_delivery", "started_at")
-    list_filter = ("status", "plan")
+    list_display = (
+        "user", "plan", "status", "grind", "roast", "provider",
+        "next_delivery", "started_at",
+    )
+    list_filter = ("status", "plan", "provider", "grind", "roast")
     search_fields = ("user__email", "plan__name")
+    readonly_fields = ("provider_reference", "created_at")
+
+
+@admin.register(SubscriptionDelivery)
+class SubscriptionDeliveryAdmin(admin.ModelAdmin):
+    list_display = ("subscription", "scheduled_for", "status", "order")
+    list_filter = ("status", "scheduled_for")
+    search_fields = ("subscription__user__email", "subscription__plan__name")
 
 
 class GiftCardTransactionInline(admin.TabularInline):

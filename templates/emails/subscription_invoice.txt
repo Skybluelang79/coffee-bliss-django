@@ -1,0 +1,11 @@
+Hi {{ subscription.user.get_short_name }},
+
+Your next {{ subscription.plan.name }} Coffee Club delivery is ready for payment.
+
+Amount: {{ currency_symbol }}{{ subscription.price }}
+Pay here: {{ invoice_url }}
+
+Your plan will continue once payment is confirmed.
+
+Thanks,
+{{ site_name }}

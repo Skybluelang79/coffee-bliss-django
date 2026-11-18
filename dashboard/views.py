@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.models import User
-from orders.models import AbandonedCart, Order, OrderStatusHistory, Reservation
+from orders.models import AbandonedCart, Order, OrderStatusHistory, Payment, Reservation
 from store.models import Coupon, NewsletterSubscriber, Product, Review
 
 
@@ -87,11 +87,30 @@ def staff_update_status(request, number):
                 messages.error(request, error or "Refund could not be processed.")
                 return redirect(request.META.get("HTTP_REFERER", "dashboard:staff_orders"))
         else:
+            was_final = order.status in {
+                Order.Status.CANCELLED,
+                Order.Status.REFUNDED,
+            }
             order.status = new_status
             if new_status == Order.Status.COMPLETED:
                 order.completed_at = timezone.now()
             if new_status == Order.Status.CANCELLED:
                 restore_for_order(order, user=request.user)
+                if not was_final:
+                    payment_service.reverse_loyalty(order)
+                    payment_service.release_coupon(order)
+                if order.gift_card_id and order.gift_card_amount:
+                    from orders.models import GiftCardTransaction
+
+                    credited = order.gift_card.credit(order.gift_card_amount)
+                    GiftCardTransaction.objects.create(
+                        gift_card=order.gift_card,
+                        order=order,
+                        kind=GiftCardTransaction.Kind.REFUND,
+                        amount=credited,
+                        balance_after=order.gift_card.balance,
+                        note=f"Cancelled order {order.number}",
+                    )
             order.save(update_fields=["status", "completed_at", "updated_at"])
             OrderStatusHistory.objects.create(
                 order=order, status=new_status, changed_by=request.user, note="Staff update"
@@ -109,6 +128,35 @@ def staff_update_status(request, number):
                 fail_silently=True,
             )
         messages.success(request, f"Order {order.number} → {order.get_status_display()}")
+    return redirect(request.META.get("HTTP_REFERER", "dashboard:staff_orders"))
+
+
+@staff_required
+@require_POST
+def staff_mark_paid(request, number):
+    """Record cash (or other offline) payment collected by staff."""
+    from orders import payments as payment_service
+
+    order = get_object_or_404(Order, number=number)
+    if order.payment_status == Order.PaymentStatus.PAID:
+        messages.info(request, f"Order {order.number} is already paid.")
+    elif order.payment_status == Order.PaymentStatus.REFUNDED or order.status in {
+        Order.Status.CANCELLED,
+        Order.Status.REFUNDED,
+    }:
+        messages.error(request, "Closed orders cannot be marked paid.")
+    else:
+        payment = payment_service.get_or_create_payment(
+            order, method=Payment.Method.CASH
+        )
+        payment.method = Payment.Method.CASH
+        payment.save(update_fields=["method", "updated_at"])
+        payment_service.mark_order_paid(
+            order,
+            reference=payment.reference or f"CASH-{order.number}",
+            user=request.user,
+        )
+        messages.success(request, f"Payment recorded for order {order.number}.")
     return redirect(request.META.get("HTTP_REFERER", "dashboard:staff_orders"))
 
 

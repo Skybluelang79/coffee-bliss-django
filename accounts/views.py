@@ -29,6 +29,7 @@ from .forms import (
     CoffeeSetPasswordForm,
 )
 from .models import Address, LoyaltyTransaction
+from .twofactor import verify_code
 
 
 class CoffeeLoginView(LoginView):
@@ -206,3 +207,22 @@ class CoffeePasswordResetConfirmView(PasswordResetConfirmView):
 
 class CoffeePasswordResetCompleteView(PasswordResetCompleteView):
     template_name = "accounts/password_reset_complete.html"
+
+
+@login_required
+def two_factor_verify(request):
+    next_url = request.POST.get("next") or request.GET.get("next") or "accounts:dashboard"
+    if not url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ) and not next_url.startswith("accounts:"):
+        next_url = "accounts:dashboard"
+
+    if request.method == "POST":
+        if verify_code(request, request.POST.get("code", "")):
+            request.session["2fa_verified"] = True
+            request.session.pop("2fa_next", None)
+            messages.success(request, "Two-factor verification complete.")
+            return redirect(next_url)
+        messages.error(request, "That code is invalid or has expired. Try again.")
+
+    return render(request, "accounts/two_factor_verify.html", {"next": next_url})

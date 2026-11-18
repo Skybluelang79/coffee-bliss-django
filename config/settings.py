@@ -7,6 +7,7 @@ and administrators.
 
 from pathlib import Path
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -24,6 +25,13 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 SITE_NAME = env("SITE_NAME")
+
+if not DEBUG and (
+    len(SECRET_KEY) < 32 or SECRET_KEY.startswith("django-insecure-")
+):
+    raise ImproperlyConfigured(
+        "Set a unique SECRET_KEY of at least 32 characters when DEBUG=False."
+    )
 
 # Render injects these at runtime. Use them to trust the public host and to
 # build absolute links (e.g. in recovery emails) without hard-coding a domain.
@@ -64,6 +72,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "accounts.middleware.TwoFactorMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "orders.middleware.CartRecoveryMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -248,3 +257,70 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Caching: local memory by default, Redis when REDIS_URL and django-redis exist
+REDIS_URL = env("REDIS_URL", default="")
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "coffee-bliss",
+        "TIMEOUT": 300,
+    }
+}
+if REDIS_URL:
+    try:
+        import django_redis  # noqa: F401
+    except ImportError:
+        pass
+    else:
+        CACHES = {
+            "default": {
+                "BACKEND": "django_redis.cache.RedisCache",
+                "LOCATION": REDIS_URL,
+                "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+                "TIMEOUT": 300,
+            }
+        }
+
+# Optional background tasks (Celery) and two-factor sign-in
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="")
+TASK_ALWAYS_EAGER = not bool(CELERY_BROKER_URL)
+TWO_FACTOR_ENABLED = env.bool("TWO_FACTOR_ENABLED", default=False)
+
+# Structured logging and optional Sentry monitoring
+LOG_LEVEL = env("LOG_LEVEL", default="INFO").upper()
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        }
+    },
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
+    "loggers": {
+        "django": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
+        "django.server": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}
+
+SENTRY_DSN = env("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[DjangoIntegration()],
+            traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.0),
+            send_default_pii=False,
+        )
+    except ImportError:  # pragma: no cover - optional dependency
+        pass

@@ -793,3 +793,24 @@ table.data tr:hover td { background: rgba(200,150,62,.04); }
   .ai-launcher { padding: .8rem; }
   .ai-panel { max-height: 75vh; }
 }
+
+/* Toast notifications and loading skeletons */
+.toast-container {
+  position: fixed; z-index: 1200; top: 1rem; right: 1rem;
+  display: flex; flex-direction: column; gap: .5rem; max-width: min(360px, 90vw);
+}
+.toast {
+  padding: .8rem 1rem; border-radius: 12px; color: #fff; font-size: .92rem;
+  box-shadow: var(--shadow-2); animation: rise .22s ease both;
+  background: var(--green-800, #256f4a);
+}
+.toast--error { background: #b42318; }
+.toast--info { background: #175cd3; }
+.toast.is-leaving { opacity: 0; transform: translateY(-6px); transition: .2s ease; }
+.skeleton {
+  display: block; border-radius: 8px; background: linear-gradient(90deg, #ece7df 25%, #f7f4ee 50%, #ece7df 75%);
+  background-size: 200% 100%; animation: shimmer 1.3s linear infinite;
+}
+.skeleton-line { height: .8rem; margin: .55rem 0; }
+.skeleton-card { min-height: 120px; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }

@@ -135,3 +135,16 @@ class SubscriptionPlanTests(TestCase):
         self.assertContains(response, "True Brew")
         self.assertContains(response, "In your box")
         self.assertContains(response, "Free priority delivery")
+
+
+class LegalPageTests(TestCase):
+    def test_legal_pages_render(self):
+        for slug in ("privacy", "terms", "refunds", "accessibility"):
+            response = self.client.get(reverse("store:legal", args=[slug]))
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, "The small print")
+
+    def test_unknown_legal_page_is_404(self):
+        self.assertEqual(
+            self.client.get(reverse("store:legal", args=["nope"])).status_code, 404
+        )

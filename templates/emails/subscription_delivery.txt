@@ -1,0 +1,11 @@
+Hi {{ subscription.user.get_short_name }},
+
+Your {{ subscription.plan.name }} Coffee Club delivery is paid and on its way.
+
+Order: {{ order_number }}
+{{ subscription.bags_per_delivery }} bag(s) · {{ subscription.get_grind_display }} · {{ subscription.get_roast_display }}
+
+Track it here: {{ manage_url }}
+
+Thanks,
+{{ site_name }}

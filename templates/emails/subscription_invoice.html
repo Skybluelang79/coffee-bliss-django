@@ -1,0 +1,6 @@
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#2b2118">
+  <h1 style="color:#c8963e">☕ Coffee Club invoice</h1>
+  <p>Hi {{ subscription.user.get_short_name }}, your next <strong>{{ subscription.plan.name }}</strong> delivery is ready for payment.</p>
+  <p><strong>{{ currency_symbol }}{{ subscription.price }}</strong></p>
+  <p><a href="{{ invoice_url }}" style="background:#c8963e;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Pay now</a></p>
+</div>

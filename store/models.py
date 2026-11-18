@@ -10,6 +10,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 
+from .images import optimize_image
+
 
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -142,6 +144,16 @@ class Product(TimeStampedModel):
         return self.name
 
     def save(self, *args, **kwargs):
+        if self.image:
+            previous = (
+                Product.objects.filter(pk=self.pk)
+                .values_list("image", flat=True)
+                .first()
+                if self.pk
+                else None
+            )
+            if previous != self.image.name:
+                optimize_image(self.image)
         if not self.slug:
             base = slugify(self.name)
             slug = base
@@ -323,6 +335,21 @@ class Coupon(TimeStampedModel):
         if self.max_uses and self.used_count >= self.max_uses:
             return False
         return True
+
+    def can_be_used_by(self, user, exclude_order=None):
+        """Check the per-customer cap in addition to the global validity rules."""
+        if not self.is_valid:
+            return False
+        if not user or not getattr(user, "is_authenticated", False):
+            return True
+        if not self.per_user_limit:
+            return True
+        used = self.orders.filter(user=user).exclude(
+            status__in=["cancelled", "refunded"]
+        )
+        if exclude_order is not None and exclude_order.pk:
+            used = used.exclude(pk=exclude_order.pk)
+        return used.count() < self.per_user_limit
 
     def discount_for(self, subtotal):
         subtotal = Decimal(subtotal)

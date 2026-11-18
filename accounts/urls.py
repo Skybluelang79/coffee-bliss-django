@@ -8,6 +8,7 @@ urlpatterns = [
     path("login/", views.CoffeeLoginView.as_view(), name="login"),
     path("signup/", views.signup_view, name="signup"),
     path("logout/", views.logout_view, name="logout"),
+    path("2fa/verify/", views.two_factor_verify, name="two_factor_verify"),
     path("", views.dashboard, name="dashboard"),
     path("profile/", views.profile_view, name="profile"),
     path("password/", views.CoffeePasswordChangeView.as_view(), name="password_change"),

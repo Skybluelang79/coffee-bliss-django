@@ -11,7 +11,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from accounts.models import User
+from accounts.models import Address, User
 from inventory.models import Ingredient, RecipeItem
 from orders.models import (
     AbandonedCart,
@@ -20,8 +20,10 @@ from orders.models import (
     Order,
     OrderItem,
     Payment,
+    Subscription,
+    SubscriptionDelivery,
 )
-from store.models import Category, Coupon, Product
+from store.models import Category, Coupon, Product, SubscriptionPlan
 
 FAST = override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
 
@@ -62,9 +64,9 @@ class CartAndCheckoutTests(TestCase):
         self.assertEqual(order.user, self.user)
         self.assertEqual(order.items.count(), 1)
         self.assertEqual(order.subtotal, Decimal("9.00"))
-        # loyalty points earned (10 per dollar)
+        # Points are awarded only after payment is confirmed.
         self.user.refresh_from_db()
-        self.assertGreater(self.user.loyalty_points, 0)
+        self.assertEqual(self.user.loyalty_points, 0)
 
     def test_coupon_applied(self):
         Coupon.objects.create(
@@ -360,10 +362,19 @@ class PaymentFlowTests(TestCase):
         self.assertEqual(page.status_code, 200)
         self.assertContains(page, "demo gateway")
 
-    def test_cash_checkout_marks_paid(self):
+    def test_cash_checkout_is_marked_paid_by_staff(self):
         self._place_order("cash")
         order = Order.objects.get()
+        self.assertEqual(order.payment_status, Order.PaymentStatus.UNPAID)
+        self.user.role = User.Role.STAFF
+        self.user.save(update_fields=["role"])
+        response = self.client.post(
+            reverse("dashboard:staff_mark_paid", args=[order.number])
+        )
+        self.assertRedirects(response, reverse("dashboard:staff_orders"))
+        order.refresh_from_db()
         self.assertEqual(order.payment_status, Order.PaymentStatus.PAID)
+        self.assertEqual(order.payments.get().method, Payment.Method.CASH)
 
     def test_refund_restores_stock(self):
         from orders import payments
@@ -843,5 +854,136 @@ class TrackingTests(TestCase):
         self.assertTrue(order.courier_is_live)
 
 
+@FAST
+class SubscriptionTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="club@example.com", password="testpass123", first_name="Ada"
+        )
+        self.address = Address.objects.create(
+            user=self.user,
+            recipient="Ada",
+            line1="1 Bean Street",
+            city="Lagos",
+            country="Nigeria",
+            is_default=True,
+        )
+        self.plan = SubscriptionPlan.objects.create(
+            name="Bean Curious",
+            slug="bean-curious",
+            price=Decimal("9000.00"),
+            interval=SubscriptionPlan.Interval.MONTHLY,
+            bags_per_delivery=1,
+        )
 
+    def _subscription(self, **kwargs):
+        defaults = dict(
+            user=self.user,
+            plan=self.plan,
+            address=self.address,
+            grind=Subscription.Grind.FILTER,
+            roast=Subscription.Roast.MEDIUM,
+            price=self.plan.price,
+            interval=self.plan.interval,
+            bags_per_delivery=self.plan.bags_per_delivery,
+            provider=Subscription.Provider.SIMULATED,
+            next_delivery=timezone.now().date() + timedelta(days=30),
+        )
+        defaults.update(kwargs)
+        return Subscription.objects.create(**defaults)
 
+    def test_start_requires_login(self):
+        response = self.client.get(
+            reverse("orders:subscription_start", args=[self.plan.slug])
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_simulated_join_creates_paid_first_delivery(self):
+        self.client.login(email="club@example.com", password="testpass123")
+        response = self.client.post(
+            reverse("orders:subscription_create", args=[self.plan.slug]),
+            {
+                "address": self.address.pk,
+                "grind": Subscription.Grind.FILTER,
+                "roast": Subscription.Roast.MEDIUM,
+                "provider": Subscription.Provider.SIMULATED,
+            },
+        )
+        self.assertRedirects(response, reverse("orders:subscription_manage"))
+        subscription = Subscription.objects.get(user=self.user)
+        self.assertEqual(subscription.status, Subscription.Status.ACTIVE)
+        delivery = subscription.deliveries.get()
+        self.assertEqual(delivery.status, SubscriptionDelivery.Status.PAID)
+        self.assertEqual(delivery.order.total, Decimal("9000.00"))
+        self.assertEqual(delivery.order.payment_status, Order.PaymentStatus.PAID)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_pause_skip_resume_and_cancel_actions(self):
+        subscription = self._subscription()
+        self.client.login(email="club@example.com", password="testpass123")
+        url = reverse("orders:subscription_action", args=[subscription.pk])
+        for action in ("skip", "unskip", "pause", "resume", "cancel"):
+            response = self.client.post(url, {"action": action})
+            self.assertRedirects(response, reverse("orders:subscription_manage"))
+            subscription.refresh_from_db()
+        self.assertEqual(subscription.status, Subscription.Status.CANCELLED)
+        self.assertFalse(subscription.skip_next)
+
+    def test_renew_command_settles_due_delivery(self):
+        subscription = self._subscription(next_delivery=timezone.now().date())
+        call_command("renew_subscriptions", verbosity=0)
+        delivery = subscription.deliveries.get()
+        self.assertEqual(delivery.status, SubscriptionDelivery.Status.PAID)
+        self.assertEqual(delivery.order.total, self.plan.price)
+        subscription.refresh_from_db()
+        self.assertGreater(subscription.next_delivery, timezone.now().date())
+
+    def test_renew_command_skips_flagged_delivery(self):
+        subscription = self._subscription(
+            next_delivery=timezone.now().date(), skip_next=True
+        )
+        call_command("renew_subscriptions", verbosity=0)
+        self.assertEqual(
+            subscription.deliveries.get().status, SubscriptionDelivery.Status.SKIPPED
+        )
+        subscription.refresh_from_db()
+        self.assertFalse(subscription.skip_next)
+
+    @override_settings(SITE_URL="https://coffee.test")
+    def test_paystack_renewal_sends_invoice(self):
+        self._subscription(
+            provider=Subscription.Provider.PAYSTACK,
+            next_delivery=timezone.now().date(),
+        )
+        call_command("renew_subscriptions", verbosity=0)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Pay now", mail.outbox[0].alternatives[0][0])
+        self.assertIn("https://coffee.test", mail.outbox[0].alternatives[0][0])
+
+    @override_settings(
+        STRIPE_SECRET_KEY="sk_test", STRIPE_WEBHOOK_SECRET="whsec_test"
+    )
+    def test_stripe_checkout_webhook_activates_subscription(self):
+        subscription = self._subscription(provider=Subscription.Provider.STRIPE)
+        payload = {
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_1",
+                    "client_reference_id": str(subscription.pk),
+                    "subscription": "sub_test_1",
+                    "metadata": {"subscription_id": str(subscription.pk)},
+                }
+            },
+        }
+        with patch("stripe.Webhook.construct_event", return_value=payload):
+            response = self.client.post(
+                reverse("orders:stripe_webhook"),
+                data=json.dumps(payload),
+                content_type="application/json",
+                HTTP_STRIPE_SIGNATURE="",
+            )
+        self.assertEqual(response.status_code, 200)
+        subscription.refresh_from_db()
+        self.assertEqual(subscription.status, Subscription.Status.ACTIVE)
+        self.assertEqual(subscription.provider_reference, "sub_test_1")

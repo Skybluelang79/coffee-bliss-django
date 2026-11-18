@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}My Coffee Club — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="block">
+  <div class="container">
+    <span class="eyebrow">Coffee Club</span>
+    <h1>My <span class="gradient-text">subscriptions</span></h1>
+    <p class="lead">Manage your grind, roast, deliveries and billing.</p>
+
+    {% for subscription in subscriptions %}
+      <div class="card panel mt-3">
+        <div class="flex between center wrap gap-sm">
+          <div>
+            <h3>{{ subscription.plan.name }}</h3>
+            <p class="small muted">{{ subscription.get_grind_display }} · {{ subscription.get_roast_display }} · {{ subscription.bags_per_delivery }} bag{{ subscription.bags_per_delivery|pluralize }}</p>
+            <p class="small muted">{{ currency_symbol }}{{ subscription.price }} per {{ subscription.get_interval_display|lower }} · {{ subscription.get_provider_display }}</p>
+          </div>
+          <span class="status {% if subscription.is_active %}green{% else %}gray{% endif %}">{{ subscription.get_status_display }}</span>
+        </div>
+
+        <div class="flex between center wrap gap-sm mt-2">
+          <p class="small"><strong>Next delivery:</strong> {{ subscription.next_delivery|date:"M d, Y"|default:"Not scheduled" }}{% if subscription.skip_next %} <span class="pill-note">Skipped</span>{% endif %}</p>
+          <div class="flex gap-sm wrap">
+            {% if subscription.is_active %}
+              <form method="post" action="{% url 'orders:subscription_action' subscription.pk %}">{% csrf_token %}<input type="hidden" name="action" value="skip"><button class="btn btn-ghost btn-sm">Skip next</button></form>
+              <form method="post" action="{% url 'orders:subscription_action' subscription.pk %}">{% csrf_token %}<input type="hidden" name="action" value="pause"><button class="btn btn-ghost btn-sm">Pause</button></form>
+              <form method="post" action="{% url 'orders:subscription_action' subscription.pk %}">{% csrf_token %}<input type="hidden" name="action" value="cancel"><button class="btn btn-ghost btn-sm">Cancel</button></form>
+            {% elif subscription.status == 'paused' or subscription.status == 'past_due' %}
+              <form method="post" action="{% url 'orders:subscription_action' subscription.pk %}">{% csrf_token %}<input type="hidden" name="action" value="resume"><button class="btn btn-sm">Resume</button></form>
+            {% endif %}
+            {% if subscription.skip_next %}
+              <form method="post" action="{% url 'orders:subscription_action' subscription.pk %}">{% csrf_token %}<input type="hidden" name="action" value="unskip"><button class="btn btn-ghost btn-sm">Restore delivery</button></form>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if subscription.deliveries.all %}
+          <div class="table-wrap mt-2">
+            <table class="data">
+              <thead><tr><th>Delivery</th><th>Status</th><th>Order</th></tr></thead>
+              <tbody>
+                {% for delivery in subscription.deliveries.all %}
+                  <tr>
+                    <td>{{ delivery.scheduled_for|date:"M d, Y" }}</td>
+                    <td><span class="status gray">{{ delivery.get_status_display }}</span></td>
+                    <td>{% if delivery.order %}<a href="{% url 'orders:track' delivery.order.number %}">{{ delivery.order.number }}</a>{% else %}—{% endif %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
+    {% empty %}
+      <div class="empty mt-3"><div class="big">☕</div><p>No Coffee Club subscriptions yet.</p><a href="{% url 'store:subscriptions' %}" class="btn">Explore plans</a></div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -75,8 +75,10 @@
       resize();
       addMessage(message, "user");
 
-      const typing = addMessage("…", "bot");
+      const typing = addMessage("", "bot");
       typing.classList.add("ai-typing");
+      typing.setAttribute("aria-label", "Loading reply");
+      typing.innerHTML = '<span class="skeleton skeleton-line" style="width:78%"></span><span class="skeleton skeleton-line" style="width:52%"></span>';
 
       try {
         const response = await fetch(endpoint, {
@@ -93,13 +95,17 @@
         try { data = await response.json(); } catch (err) { data = {}; }
         typing.remove();
         if (!response.ok) {
-          addMessage(data.detail || "Sorry, I couldn't answer that just now.", "bot");
+          const detail = data.detail || "Sorry, I couldn't answer that just now.";
+          addMessage(detail, "bot");
+          if (window.coffeeToast) window.coffeeToast(detail, "error");
           return;
         }
         addMessage(data.reply || "Sorry, I didn't get a reply.", "bot");
       } catch (err) {
         typing.remove();
-        addMessage("I can't reach the assistant right now. Please try again.", "bot");
+        const detail = "I can't reach the assistant right now. Please try again.";
+        addMessage(detail, "bot");
+        if (window.coffeeToast) window.coffeeToast(detail, "error");
       } finally {
         busy = false;
         if (send) send.disabled = false;

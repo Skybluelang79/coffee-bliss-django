@@ -75,7 +75,9 @@ class StoreLocationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = StoreLocationSerializer
 
 
-class OrderViewSet(viewsets.ModelViewSet):
+class OrderViewSet(viewsets.ReadOnlyModelViewSet):
+    """Orders are created through checkout, never through the API."""
+
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = "number"
@@ -87,17 +89,6 @@ class OrderViewSet(viewsets.ModelViewSet):
         if user.is_staff_member:
             return Order.objects.all().prefetch_related("items")
         return Order.objects.filter(user=user).prefetch_related("items")
-
-    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAdminUser])
-    def set_status(self, request, number=None):
-        order = self.get_object()
-        new_status = request.data.get("status")
-        valid = {c[0] for c in Order.Status.choices}
-        if new_status not in valid:
-            return Response({"detail": "Invalid status."}, status=400)
-        order.status = new_status
-        order.save(update_fields=["status", "updated_at"])
-        return Response(self.get_serializer(order).data)
 
 
 class ReservationViewSet(viewsets.ModelViewSet):

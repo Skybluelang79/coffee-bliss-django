@@ -3,6 +3,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
+from config.health import healthz
 from dashboard.views import admin_home, staff_home
 
 
@@ -16,6 +17,7 @@ def smart_admin(request):
 
 
 urlpatterns = [
+    path("healthz/", healthz, name="healthz"),
     path("django-admin/", admin.site.urls),
     path("", include("store.urls")),
     path("accounts/", include("accounts.urls")),

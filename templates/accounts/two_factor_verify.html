@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Verify sign-in — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="card auth-card reveal">
+    <span class="eyebrow">Extra security</span>
+    <h1>Check your inbox</h1>
+    <p class="small mb-3">We emailed a 6-digit code to verify it's really you.</p>
+    <form method="post" data-lock-submit>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}" />
+      <div class="field">
+        <label for="id_code">Verification code</label>
+        <input id="id_code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required autofocus />
+      </div>
+      <button class="btn mt-2">Verify and continue</button>
+    </form>
+    <p class="small mt-3"><a href="{% url 'accounts:logout' %}">Use a different account</a></p>
+  </div>
+</div>
+{% endblock %}

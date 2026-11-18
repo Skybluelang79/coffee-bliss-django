@@ -1,0 +1,13 @@
+Hi {{ subscription.user.get_short_name }},
+
+Your {{ subscription.plan.name }} Coffee Club subscription is active.
+
+{{ subscription.bags_per_delivery }} bag(s) · {{ subscription.get_grind_display }} · {{ subscription.get_roast_display }}
+{{ currency_symbol }}{{ subscription.price }} per delivery
+Next delivery: {{ subscription.next_delivery|date:"M d, Y" }}
+
+Manage, pause or skip a delivery anytime:
+{{ manage_url }}
+
+Thanks for brewing with us,
+{{ site_name }}

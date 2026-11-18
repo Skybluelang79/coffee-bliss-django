@@ -113,6 +113,7 @@ class ProfileForm(StyledFormMixin, forms.ModelForm):
             "avatar",
             "newsletter_opt_in",
             "marketing_opt_in",
+            "two_factor_enabled",
         )
         widgets = {"avatar": forms.ClearableFileInput(attrs={"accept": "image/*"})}
 

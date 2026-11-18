@@ -1,0 +1,8 @@
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#2b2118">
+  <h1 style="color:#c8963e">☕ {{ site_name }} Coffee Club</h1>
+  <p>Hi {{ subscription.user.get_short_name }}, your <strong>{{ subscription.plan.name }}</strong> subscription is active.</p>
+  <p>{{ subscription.bags_per_delivery }} bag(s) · {{ subscription.get_grind_display }} · {{ subscription.get_roast_display }}<br>
+  <strong>{{ currency_symbol }}{{ subscription.price }}</strong> per delivery · next: {{ subscription.next_delivery|date:"M d, Y" }}</p>
+  <p><a href="{{ manage_url }}" style="background:#c8963e;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Manage subscription</a></p>
+  <p style="color:#7c6c5d;font-size:12px">Pause, skip or cancel anytime.</p>
+</div>

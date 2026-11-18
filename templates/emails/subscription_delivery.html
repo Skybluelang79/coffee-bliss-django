@@ -1,0 +1,6 @@
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#2b2118">
+  <h1 style="color:#c8963e">☕ Coffee Club delivery confirmed</h1>
+  <p>Hi {{ subscription.user.get_short_name }}, your <strong>{{ subscription.plan.name }}</strong> delivery is paid.</p>
+  <p>Order <strong>{{ order_number }}</strong> · {{ subscription.bags_per_delivery }} bag(s) · {{ subscription.get_grind_display }} · {{ subscription.get_roast_display }}</p>
+  <p><a href="{{ manage_url }}" style="background:#c8963e;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">View subscription</a></p>
+</div>

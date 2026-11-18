@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Join {{ plan.name }} — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="block">
+  <div class="container">
+    <span class="eyebrow">Coffee Club</span>
+    <h1>Set up <span class="gradient-text">{{ plan.name }}</span></h1>
+    <p class="lead">{{ plan.tagline }} · {{ currency_symbol }}{{ plan.price }} per {{ plan.get_interval_display|lower }} · {{ plan.bags_per_delivery }} bag{{ plan.bags_per_delivery|pluralize }} per delivery.</p>
+
+    <div class="grid grid-2 mt-3">
+      <div class="card panel">
+        <form method="post" action="{% url 'orders:subscription_create' plan.slug %}" data-lock-submit>
+          {% csrf_token %}
+          <label class="field">
+            <span>Grind</span>
+            <select name="grind" class="form-select">
+              {% for value, label in grinds %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+            </select>
+          </label>
+          <label class="field">
+            <span>Roast</span>
+            <select name="roast" class="form-select">
+              {% for value, label in roasts %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+            </select>
+          </label>
+          <label class="field">
+            <span>Delivery address</span>
+            <select name="address" class="form-select" required>
+              <option value="">Choose an address</option>
+              {% for address in addresses %}<option value="{{ address.pk }}">{{ address.get_label_display }} — {{ address.one_line }}</option>{% endfor %}
+            </select>
+          </label>
+          {% if not addresses %}<p class="small">Add an address first: <a href="{% url 'accounts:addresses' %}">Manage addresses</a>.</p>{% endif %}
+          <label class="field">
+            <span>Payment provider</span>
+            <select name="provider" class="form-select">
+              {% for provider in providers %}<option value="{{ provider }}">{{ provider|capfirst }}</option>{% endfor %}
+            </select>
+          </label>
+          <button class="btn btn-block mt-2" type="submit" {% if not addresses %}disabled{% endif %}>Start subscription</button>
+        </form>
+      </div>
+
+      <div class="card panel">
+        <h3>What happens next?</h3>
+        <ul class="mt-2">
+          <li>We roast {{ plan.bags_per_delivery }} fresh bag{{ plan.bags_per_delivery|pluralize }} to your grind and roast.</li>
+          <li>Delivery is free on every Coffee Club plan.</li>
+          <li>Pause, skip a delivery or cancel from your dashboard at any time.</li>
+        </ul>
+        <a href="{% url 'store:subscriptions' %}" class="btn btn-ghost btn-sm mt-2">Compare plans</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

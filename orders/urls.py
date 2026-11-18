@@ -33,4 +33,14 @@ urlpatterns = [
     path("history/", views.order_history, name="history"),
     path("reserve/", views.reserve, name="reserve"),
     path("reserve/success/<int:pk>/", views.reservation_success, name="reservation_success"),
+    path("club/manage/", views.subscription_manage, name="subscription_manage"),
+    path("club/return/", views.subscription_return, name="subscription_return"),
+    path("club/<slug:slug>/", views.subscription_start, name="subscription_start"),
+    path("club/<slug:slug>/join/", views.subscription_create, name="subscription_create"),
+    path("club/<int:pk>/action/", views.subscription_action, name="subscription_action"),
+    path(
+        "club/<int:pk>/paystack/callback/",
+        views.subscription_paystack_callback,
+        name="subscription_paystack_callback",
+    ),
 ]

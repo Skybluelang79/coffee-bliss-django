@@ -506,7 +506,25 @@ class Subscription(models.Model):
     class Status(models.TextChoices):
         ACTIVE = "active", "Active"
         PAUSED = "paused", "Paused"
+        PAST_DUE = "past_due", "Payment issue"
         CANCELLED = "cancelled", "Cancelled"
+
+    class Grind(models.TextChoices):
+        WHOLE = "whole", "Whole bean"
+        ESPRESSO = "espresso", "Espresso"
+        FILTER = "filter", "Filter"
+        FRENCH_PRESS = "french_press", "French press"
+
+    class Roast(models.TextChoices):
+        ROASTER = "roaster", "Roaster's choice"
+        LIGHT = "light", "Light"
+        MEDIUM = "medium", "Medium"
+        DARK = "dark", "Dark"
+
+    class Provider(models.TextChoices):
+        SIMULATED = "simulated", "Simulated"
+        STRIPE = "stripe", "Stripe"
+        PAYSTACK = "paystack", "Paystack"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="subscriptions"
@@ -517,22 +535,122 @@ class Subscription(models.Model):
     status = models.CharField(
         max_length=12, choices=Status.choices, default=Status.ACTIVE
     )
-    grind = models.CharField(max_length=60, blank=True)
+    grind = models.CharField(
+        max_length=20, choices=Grind.choices, default=Grind.WHOLE
+    )
+    roast = models.CharField(
+        max_length=20, choices=Roast.choices, default=Roast.ROASTER
+    )
+    address = models.ForeignKey(
+        "accounts.Address",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="subscriptions",
+    )
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    interval = models.CharField(
+        max_length=12,
+        choices=[
+            ("weekly", "Weekly"),
+            ("biweekly", "Every 2 weeks"),
+            ("monthly", "Monthly"),
+        ],
+        default="monthly",
+    )
+    bags_per_delivery = models.PositiveIntegerField(default=1)
+    provider = models.CharField(
+        max_length=20, choices=Provider.choices, default=Provider.SIMULATED
+    )
+    provider_reference = models.CharField(max_length=255, blank=True, db_index=True)
+    skip_next = models.BooleanField(default=False)
     next_delivery = models.DateField(blank=True, null=True)
     started_at = models.DateTimeField(default=timezone.now)
+    paused_at = models.DateTimeField(blank=True, null=True)
+    cancelled_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.user} — {self.plan.name}"
 
-    def advance_delivery(self):
-        from datetime import timedelta
+    @property
+    def is_active(self):
+        return self.status == self.Status.ACTIVE
 
-        mapping = {"weekly": 7, "biweekly": 14, "monthly": 30}
-        days = mapping.get(self.plan.interval, 30)
+    def pause(self):
+        if self.is_active:
+            self.status = self.Status.PAUSED
+            self.paused_at = timezone.now()
+            self.save(update_fields=["status", "paused_at"])
+
+    def resume(self):
+        if self.status in {self.Status.PAUSED, self.Status.PAST_DUE}:
+            self.status = self.Status.ACTIVE
+            self.paused_at = None
+            self.save(update_fields=["status", "paused_at"])
+
+    def cancel(self):
+        if self.status != self.Status.CANCELLED:
+            self.status = self.Status.CANCELLED
+            self.cancelled_at = timezone.now()
+            self.save(update_fields=["status", "cancelled_at"])
+
+    def skip_next_delivery(self):
+        if self.is_active:
+            self.skip_next = True
+            self.save(update_fields=["skip_next"])
+
+    def advance_delivery(self):
+        days = {"weekly": 7, "biweekly": 14, "monthly": 30}.get(self.interval, 30)
         base = self.next_delivery or timezone.now().date()
-        self.next_delivery = base + timedelta(days=days)
-        self.save(update_fields=["next_delivery"])
+        today = timezone.now().date()
+        while base <= today:
+            base += timedelta(days=days)
+        self.next_delivery = base
+        self.skip_next = False
+        self.save(update_fields=["next_delivery", "skip_next"])
+
+
+class SubscriptionDelivery(models.Model):
+    class Status(models.TextChoices):
+        SCHEDULED = "scheduled", "Scheduled"
+        PAID = "paid", "Paid"
+        FULFILLED = "fulfilled", "Fulfilled"
+        SKIPPED = "skipped", "Skipped"
+        FAILED = "failed", "Failed"
+
+    subscription = models.ForeignKey(
+        Subscription, on_delete=models.CASCADE, related_name="deliveries"
+    )
+    scheduled_for = models.DateField()
+    status = models.CharField(
+        max_length=12, choices=Status.choices, default=Status.SCHEDULED
+    )
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="subscription_delivery",
+    )
+    provider_reference = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-scheduled_for"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["subscription", "scheduled_for"],
+                name="unique_subscription_delivery_date",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.subscription} — {self.scheduled_for}"
+
 
 
 class GiftCard(models.Model):
