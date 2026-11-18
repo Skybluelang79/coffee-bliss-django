@@ -489,8 +489,14 @@ def stripe_webhook(request):
 
 
 @csrf_exempt
-@require_POST
 def paystack_webhook(request):
+    if request.method == "GET":
+        return HttpResponse(
+            "Paystack webhook endpoint is ready.",
+            content_type="text/plain",
+        )
+    if request.method != "POST":
+        return HttpResponse(status=405)
     handled, message = payments.handle_paystack_webhook(
         request.body, request.META.get("HTTP_X_PAYSTACK_SIGNATURE", "")
     )

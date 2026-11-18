@@ -547,6 +547,11 @@ class PaystackPaymentTests(TestCase):
         self.beans.refresh_from_db()
         self.assertEqual(self.beans.stock, Decimal("1000"))
 
+    def test_webhook_get_is_browser_friendly(self):
+        response = self.client.get(reverse("orders:paystack_webhook"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "webhook endpoint is ready")
+
     def test_webhook_marks_order_paid(self):
         self._place_order()
         order = Order.objects.get()
