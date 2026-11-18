@@ -165,6 +165,7 @@ def api_me(request):
             "product_id": drf_serializers.IntegerField(),
             "quantity": drf_serializers.IntegerField(required=False, default=1),
             "remove": drf_serializers.BooleanField(required=False, default=False),
+            "line_key": drf_serializers.CharField(required=False),
         },
     ),
     responses={200: {"type": "object", "additionalProperties": True}},
@@ -178,13 +179,14 @@ def api_cart(request):
         if not product:
             return Response({"detail": "Product not found."}, status=404)
         if request.data.get("remove"):
-            cart.remove(product.pk)
+            cart.remove(product.pk, key=request.data.get("line_key"))
         else:
             cart.add(product, quantity=int(request.data.get("quantity", 1)))
     if request.method == "DELETE":
         cart.clear()
     data = [
         {
+            "line_key": line["key"],
             "product_id": line["product"].pk,
             "name": line["product"].name,
             "quantity": line["quantity"],

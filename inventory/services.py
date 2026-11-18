@@ -19,17 +19,22 @@ def _record(**kwargs):
 def consume_for_order(order, user=None):
     """Deduct ingredient + product stock for a confirmed order.
 
-    Idempotent: guarded by order.stock_consumed.
+    Idempotent: guarded by order.stock_consumed. Rows are locked for the
+    duration of the transaction so concurrent orders cannot both consume the
+    same remaining stock.
     Returns a dict summary of ingredient shortfalls (for low-stock warnings).
     """
+    order = type(order).objects.select_for_update().get(pk=order.pk)
     if order.stock_consumed:
         return {}
 
     shortfalls = {}
     for item in order.items.select_related("product"):
-        product = item.product
-        if product is None:
+        if item.product is None:
             continue
+        product = type(item.product).objects.select_for_update().get(
+            pk=item.product_id
+        )
         qty = Decimal(item.quantity)
 
         # Product-level stock (cups, retail bags, merch).
@@ -47,8 +52,10 @@ def consume_for_order(order, user=None):
             )
 
         # Ingredient consumption via recipe.
-        for line in product.recipe_items.select_related("ingredient"):
-            ingredient = line.ingredient
+        for line in product.recipe_items.all():
+            ingredient = type(line.ingredient).objects.select_for_update().get(
+                pk=line.ingredient_id
+            )
             used = line.quantity * qty
             ingredient.stock = max(Decimal("0"), ingredient.stock - used)
             ingredient.save(update_fields=["stock", "updated_at"])
@@ -58,7 +65,7 @@ def consume_for_order(order, user=None):
                 quantity=-used,
                 unit=ingredient.unit,
                 unit_cost=ingredient.cost_per_unit,
-                reason=f"Order {order.number} · {product.name}",
+                reason=f"Order {order.number} - {product.name}",
                 order=order,
                 created_by=user,
             )
@@ -73,12 +80,15 @@ def consume_for_order(order, user=None):
 @transaction.atomic
 def restore_for_order(order, user=None):
     """Put stock back when an order is cancelled/refunded after consumption."""
+    order = type(order).objects.select_for_update().get(pk=order.pk)
     if not order.stock_consumed:
         return
     for item in order.items.select_related("product"):
-        product = item.product
-        if product is None:
+        if item.product is None:
             continue
+        product = type(item.product).objects.select_for_update().get(
+            pk=item.product_id
+        )
         qty = Decimal(item.quantity)
         if product.track_stock:
             product.stock = product.stock + int(qty)
@@ -92,8 +102,10 @@ def restore_for_order(order, user=None):
                 order=order,
                 created_by=user,
             )
-        for line in product.recipe_items.select_related("ingredient"):
-            ingredient = line.ingredient
+        for line in product.recipe_items.all():
+            ingredient = type(line.ingredient).objects.select_for_update().get(
+                pk=line.ingredient_id
+            )
             back = line.quantity * qty
             ingredient.stock = ingredient.stock + back
             ingredient.save(update_fields=["stock", "updated_at"])

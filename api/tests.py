@@ -19,6 +19,19 @@ class ApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["count"], 1)
 
+    def test_product_list_filters_by_kind(self):
+        Product.objects.create(
+            name="API Beans",
+            category=self.category,
+            kind=Product.Kind.BEANS,
+            price=Decimal("15.00"),
+        )
+        response = self.client.get("/api/products/", {"kind": "beans"})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["count"], 1)
+        self.assertEqual(body["results"][0]["name"], "API Beans")
+
     def test_register_and_me(self):
         response = self.client.post(
             "/api/auth/register/",

@@ -5,8 +5,9 @@ from django.core.paginator import Paginator
 from django.db.models import Avg, Count, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
 from django.views.decorators.http import require_POST
+
+from config.redirects import safe_redirect
 
 from .cache import active_plans
 from .forms import ContactForm, NewsletterForm, ReviewForm
@@ -84,11 +85,17 @@ def menu(request):
         "price_asc": "price",
         "price_desc": "-price",
         "newest": "-created_at",
-        "rating": "-created_at",
         "name": "name",
         "featured": "-is_featured",
     }
-    products = products.order_by(sort_map.get(sort, "-is_featured"))
+    if sort == "rating":
+        products = products.annotate(
+            rating_avg=Avg(
+                "reviews__rating", filter=Q(reviews__is_approved=True)
+            )
+        ).order_by("-rating_avg", "-created_at")
+    else:
+        products = products.order_by(sort_map.get(sort, "-is_featured"))
 
     paginator = Paginator(products, 9)
     page = paginator.get_page(request.GET.get("page"))
@@ -276,7 +283,7 @@ def subscribe(request):
             messages.info(request, "You're already subscribed.")
     else:
         messages.error(request, "Please enter a valid email address.")
-    return redirect(request.META.get("HTTP_REFERER", reverse("store:home")))
+    return safe_redirect(request, "store:home")
 
 
 def about(request):

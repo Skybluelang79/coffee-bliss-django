@@ -23,10 +23,12 @@
             <div class="col flex gap-sm" style="align-items:flex-end">
               <form method="post" action="{% url 'orders:cart_update' line.product.id %}" class="flex gap-sm center">
                 {% csrf_token %}
+                <input type="hidden" name="line" value="{{ line.key }}" />
                 <input type="number" name="quantity" value="{{ line.quantity }}" min="0" max="50" class="form-input qty-input" data-autosubmit />
               </form>
               <form method="post" action="{% url 'orders:cart_remove' line.product.id %}">
                 {% csrf_token %}
+                <input type="hidden" name="line" value="{{ line.key }}" />
                 <button class="btn btn-ghost btn-sm" style="color:var(--danger)">Remove</button>
               </form>
               <strong>{{ currency_symbol }}{{ line.line_total|floatformat:2 }}</strong>
@@ -55,6 +57,15 @@
           <input type="text" name="code" class="form-input" placeholder="Promo code" value="{{ cart.get_coupon.code|default:'' }}" />
           <button class="btn btn-ghost">Apply</button>
         </form>
+
+        {% if user.is_authenticated and user.loyalty_points %}
+          <form method="post" action="{% url 'orders:apply_points' %}" class="flex gap-sm mt-1">
+            {% csrf_token %}
+            <input type="number" name="points" class="form-input" min="0" max="{{ user.loyalty_points }}" value="{{ cart.points_used }}" placeholder="Loyalty beans" />
+            <button class="btn btn-ghost">Use beans</button>
+          </form>
+          <p class="small muted mt-1">{{ user.loyalty_points }} beans available · {{ currency_symbol }}{{ user.redeem_value|floatformat:2 }} value</p>
+        {% endif %}
 
         {% if cart.get_gift_card and cart.get_gift_card.is_usable %}
           <form method="post" action="{% url 'orders:remove_gift_card' %}" class="mt-1">

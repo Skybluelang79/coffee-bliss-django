@@ -59,13 +59,63 @@ class OrderAdmin(admin.ModelAdmin):
     actions = ["mark_confirmed", "mark_preparing", "mark_completed", "mark_cancelled"]
 
     def _transition(self, request, queryset, status):
+        changed = 0
+        failed = 0
         for order in queryset:
-            order.status = status
-            order.save(update_fields=["status", "updated_at"])
-            OrderStatusHistory.objects.create(
-                order=order, status=status, changed_by=request.user, note="Bulk action"
+            if order.status == status:
+                continue
+            if status == Order.Status.CANCELLED:
+                if not self._cancel(order, request):
+                    failed += 1
+                    continue
+            else:
+                order.status = status
+                if status == Order.Status.COMPLETED:
+                    order.completed_at = timezone.now()
+                order.save(
+                    update_fields=["status", "completed_at", "updated_at"]
+                )
+                OrderStatusHistory.objects.create(
+                    order=order,
+                    status=status,
+                    changed_by=request.user,
+                    note="Bulk action",
+                )
+            changed += 1
+        message = f"{changed} order(s) set to {status}."
+        if failed:
+            message += f" {failed} could not be cancelled/refunded."
+        self.message_user(request, message)
+
+    def _cancel(self, order, request):
+        from inventory.services import restore_for_order
+        from orders import payments as payment_service
+
+        if order.payment_status == Order.PaymentStatus.PAID:
+            ok, _error = payment_service.refund_order(order, user=request.user)
+            return ok
+        restore_for_order(order, user=request.user)
+        payment_service.reverse_loyalty(order)
+        payment_service.release_coupon(order)
+        if order.gift_card_id and order.gift_card_amount:
+            credited = order.gift_card.credit(order.gift_card_amount)
+            GiftCardTransaction.objects.create(
+                gift_card=order.gift_card,
+                order=order,
+                kind=GiftCardTransaction.Kind.REFUND,
+                amount=credited,
+                balance_after=order.gift_card.balance,
+                note=f"Cancelled order {order.number}",
             )
-        self.message_user(request, f"{queryset.count()} order(s) set to {status}.")
+        order.status = Order.Status.CANCELLED
+        order.save(update_fields=["status", "updated_at"])
+        OrderStatusHistory.objects.create(
+            order=order,
+            status=Order.Status.CANCELLED,
+            changed_by=request.user,
+            note="Bulk action",
+        )
+        return True
 
     @admin.action(description="Mark as confirmed")
     def mark_confirmed(self, request, queryset):

@@ -3,6 +3,7 @@ import logging
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import redirect_to_login
 from django.db import transaction
 from django.db.models import F, Q
 from django.http import Http404, HttpResponse, JsonResponse
@@ -11,6 +12,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+
+from config.redirects import safe_redirect
 
 from . import payments, subscription_billing as billing
 from .cart import Cart
@@ -70,7 +73,7 @@ def cart_add(request, product_id):
     messages.success(request, f"Added {quantity} × {product.name} to your cart.")
     if request.POST.get("buy_now"):
         return redirect("orders:checkout")
-    return redirect(request.POST.get("next") or reverse("orders:cart"))
+    return safe_redirect(request, "orders:cart")
 
 
 @require_POST
@@ -80,7 +83,7 @@ def cart_update(request, product_id):
         quantity = int(request.POST.get("quantity", 1))
     except (TypeError, ValueError):
         quantity = 1
-    cart.update(product_id, quantity)
+    cart.update(product_id, quantity, key=request.POST.get("line"))
     messages.info(request, "Cart updated.")
     return redirect("orders:cart")
 
@@ -88,7 +91,7 @@ def cart_update(request, product_id):
 @require_POST
 def cart_remove(request, product_id):
     cart = Cart(request)
-    cart.remove(product_id)
+    cart.remove(product_id, key=request.POST.get("line"))
     messages.info(request, "Item removed from cart.")
     return redirect("orders:cart")
 
@@ -111,6 +114,26 @@ def apply_coupon(request):
     return redirect("orders:cart")
 
 
+@login_required
+@require_POST
+def apply_points(request):
+    cart = Cart(request)
+    try:
+        points = int(request.POST.get("points", 0))
+    except (TypeError, ValueError):
+        points = 0
+    if points <= 0:
+        cart.set_points(0)
+        messages.info(request, "Loyalty beans removed from this order.")
+    else:
+        points = min(points, request.user.loyalty_points)
+        cart.set_points(points)
+        messages.success(
+            request, f"Applying {points} loyalty beans to this order."
+        )
+    return redirect("orders:cart")
+
+
 @require_POST
 def apply_gift_card(request):
     cart = Cart(request)
@@ -121,7 +144,7 @@ def apply_gift_card(request):
     else:
         cart.set_gift_card(None)
         messages.error(request, error)
-    return redirect(request.POST.get("next") or reverse("orders:cart"))
+    return safe_redirect(request, "orders:cart")
 
 
 @require_POST
@@ -479,13 +502,9 @@ def order_confirmation(request, number):
     return render(request, "orders/confirmation.html", {"order": order})
 
 
+@login_required
 def track_order(request, number):
-    order = get_object_or_404(
-        Order.objects.prefetch_related("items", "history").select_related(
-            "location", "user"
-        ),
-        number=number,
-    )
+    order = _get_owned_order(request, number)
     if order.estimated_ready_at is None:
         order.ensure_estimated_ready_at()
     is_owner = request.user.is_authenticated and (
@@ -506,7 +525,9 @@ def track_order(request, number):
 
 def track_status(request, number):
     """JSON snapshot used by the live-updating tracking page."""
-    order = get_object_or_404(Order.objects.prefetch_related("items"), number=number)
+    if not request.user.is_authenticated:
+        return JsonResponse({"detail": "Authentication required."}, status=403)
+    order = _get_owned_order(request, number)
     return JsonResponse(
         {
             "number": order.number,
@@ -539,15 +560,28 @@ def track_status(request, number):
 
 
 def track_lookup(request):
-    """Look up a single order number, or list every order for an email."""
+    """Look up an order for the signed-in customer only."""
     query = (request.GET.get("number") or request.GET.get("q") or "").strip()
     if query:
         if "@" in query:
-            orders = (
-                Order.objects.filter(
+            if not request.user.is_authenticated:
+                return redirect_to_login(reverse("orders:track_lookup"))
+            if request.user.is_staff_member:
+                orders = Order.objects.filter(
                     Q(guest_email__iexact=query) | Q(user__email__iexact=query)
                 )
-                .select_related("user")
+            elif request.user.email.lower() == query.lower():
+                orders = Order.objects.filter(
+                    Q(user=request.user)
+                    | Q(guest_email__iexact=request.user.email)
+                )
+            else:
+                messages.error(
+                    request, "Sign in with the email used to place the order."
+                )
+                return redirect("orders:track_lookup")
+            orders = (
+                orders.select_related("user")
                 .prefetch_related("items")
                 .order_by("-created_at")
             )
@@ -556,13 +590,22 @@ def track_lookup(request):
                 "orders/track_results.html",
                 {"query": query, "email": query, "orders": orders},
             )
+        if not request.user.is_authenticated:
+            return redirect_to_login(
+                reverse("orders:track", args=[query.upper()])
+            )
         return redirect("orders:track", number=query.upper())
     return render(request, "orders/track_lookup.html")
 
 
 def _get_owned_order(request, number):
     """Fetch an order the current user owns (staff may access any order)."""
-    order = get_object_or_404(Order.objects.select_related("user"), number=number)
+    order = get_object_or_404(
+        Order.objects.select_related("user", "location").prefetch_related(
+            "items", "history"
+        ),
+        number=number,
+    )
     if not (
         request.user.is_authenticated
         and (order.user_id == request.user.id or request.user.is_staff_member)
@@ -741,7 +784,7 @@ def notify_pref(request):
         f"Status emails for order {order.number} are now "
         + ("on." if order.notify_email else "off."),
     )
-    return redirect("orders:track", number=order.number)
+    return redirect("store:home")
 
 
 

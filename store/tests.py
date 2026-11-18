@@ -10,6 +10,7 @@ from store.models import (
     BrewStep,
     Category,
     Product,
+    Review,
     SubscriptionPlan,
 )
 
@@ -51,6 +52,24 @@ class StoreViewTests(TestCase):
         response = self.client.get(reverse("store:menu"), {"q": "latte"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Test Latte")
+
+    def test_menu_sorts_by_approved_rating(self):
+        best = Product.objects.create(
+            name="Best Latte",
+            category=self.category,
+            kind=Product.Kind.DRINK,
+            price=Decimal("5.00"),
+        )
+        reviewer = User.objects.create_user(
+            email="reviewer@example.com", password="reviewpass123"
+        )
+        Review.objects.create(
+            product=best, user=reviewer, rating=5, body="Excellent."
+        )
+        response = self.client.get(reverse("store:menu"), {"sort": "rating"})
+        self.assertEqual(response.status_code, 200)
+        products = list(response.context["products"])
+        self.assertEqual(products[0].pk, best.pk)
 
     def test_navbar_renders_enhanced_markup(self):
         response = self.client.get(reverse("store:home"))

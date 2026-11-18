@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.models import User
+from config.redirects import safe_redirect
 from orders.models import AbandonedCart, Order, OrderStatusHistory, Payment, Reservation
 from store.models import Coupon, NewsletterSubscriber, Product, Review
 
@@ -77,6 +78,9 @@ def staff_update_status(request, number):
     order = get_object_or_404(Order, number=number)
     new_status = request.POST.get("status")
     valid = {choice[0] for choice in Order.Status.choices}
+    if new_status == order.status:
+        messages.info(request, f"Order {order.number} is already {order.get_status_display().lower()}.")
+        return safe_redirect(request, "dashboard:staff_orders")
     if new_status in valid:
         from orders import payments as payment_service
         from inventory.services import restore_for_order
@@ -85,7 +89,7 @@ def staff_update_status(request, number):
             ok, error = payment_service.refund_order(order, user=request.user)
             if not ok:
                 messages.error(request, error or "Refund could not be processed.")
-                return redirect(request.META.get("HTTP_REFERER", "dashboard:staff_orders"))
+                return safe_redirect(request, "dashboard:staff_orders")
         else:
             was_final = order.status in {
                 Order.Status.CANCELLED,
@@ -115,20 +119,8 @@ def staff_update_status(request, number):
             OrderStatusHistory.objects.create(
                 order=order, status=new_status, changed_by=request.user, note="Staff update"
             )
-        # Notify the customer via console email in development.
-        from django.core.mail import send_mail
-        from django.conf import settings
-
-        if order.user and order.user.email:
-            send_mail(
-                subject=f"Order {order.number} is now {order.get_status_display()}",
-                message=f"Hi {order.user.get_short_name()}, your order is now '{order.get_status_display()}'.",
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[order.user.email],
-                fail_silently=True,
-            )
         messages.success(request, f"Order {order.number} → {order.get_status_display()}")
-    return redirect(request.META.get("HTTP_REFERER", "dashboard:staff_orders"))
+    return safe_redirect(request, "dashboard:staff_orders")
 
 
 @staff_required
@@ -157,7 +149,7 @@ def staff_mark_paid(request, number):
             user=request.user,
         )
         messages.success(request, f"Payment recorded for order {order.number}.")
-    return redirect(request.META.get("HTTP_REFERER", "dashboard:staff_orders"))
+    return safe_redirect(request, "dashboard:staff_orders")
 
 
 @staff_required
@@ -219,7 +211,7 @@ def staff_update_reservation(request, pk):
         reservation.status = new_status
         reservation.save(update_fields=["status"])
         messages.success(request, f"Reservation updated to {reservation.get_status_display()}.")
-    return redirect(request.META.get("HTTP_REFERER", "dashboard:staff_reservations"))
+    return safe_redirect(request, "dashboard:staff_reservations")
 
 
 @manager_required

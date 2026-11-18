@@ -46,6 +46,21 @@ class CartAndCheckoutTests(TestCase):
         cart = self.client.session.get("coffee_cart")
         self.assertEqual(cart[str(self.product.id)]["quantity"], 2)
 
+    def test_cart_add_ignores_offsite_next_redirect(self):
+        response = self.client.post(
+            reverse("orders:cart_add", args=[self.product.id]),
+            {"quantity": 1, "next": "https://evil.example/phish"},
+        )
+        self.assertRedirects(response, reverse("orders:cart"))
+
+    def test_same_product_with_different_options_keeps_two_lines(self):
+        url = reverse("orders:cart_add", args=[self.product.id])
+        self.client.post(url, {"quantity": 1, "size": "Small", "milk": "Whole"})
+        self.client.post(url, {"quantity": 2, "size": "Large", "milk": "Oat"})
+        cart = self.client.session.get("coffee_cart")
+        self.assertEqual(len(cart), 2)
+        self.assertEqual(sum(item["quantity"] for item in cart.values()), 3)
+
     def test_checkout_creates_order(self):
         self.client.login(email="buyer@example.com", password="testpass123")
         self.client.post(reverse("orders:cart_add", args=[self.product.id]), {"quantity": 3})
@@ -76,6 +91,15 @@ class CartAndCheckoutTests(TestCase):
         response = self.client.post(reverse("orders:apply_coupon"), {"code": "SAVE10"})
         self.assertEqual(response.status_code, 302)
         self.assertEqual(self.client.session.get("coffee_coupon"), "SAVE10")
+
+    def test_loyalty_points_are_capped_and_applied(self):
+        self.user.loyalty_points = 50
+        self.user.save(update_fields=["loyalty_points"])
+        self.client.login(email="buyer@example.com", password="testpass123")
+        self.client.post(
+            reverse("orders:apply_points"), {"points": 999}
+        )
+        self.assertEqual(self.client.session.get("coffee_points"), 50)
 
     def test_order_number_generated(self):
         order = Order.objects.create(customer_name="Walk In")
@@ -725,14 +749,28 @@ class TrackingTests(TestCase):
         order = self._order()
         order.estimated_ready_at = None
         order.save(update_fields=["estimated_ready_at"])
+        self.client.login(email="tracker@example.com", password="trackpass123")
         response = self.client.get(reverse("orders:track", args=[order.number]))
         self.assertEqual(response.status_code, 200)
         order.refresh_from_db()
         self.assertIsNotNone(order.estimated_ready_at)
         self.assertContains(response, order.number)
 
+    def test_track_requires_sign_in(self):
+        order = self._order()
+        response = self.client.get(reverse("orders:track", args=[order.number]))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response.url)
+
+    def test_track_hides_other_customers_orders(self):
+        order = self._order()
+        self.client.login(email="stranger@example.com", password="nope12345")
+        response = self.client.get(reverse("orders:track", args=[order.number]))
+        self.assertEqual(response.status_code, 404)
+
     def test_status_endpoint_json(self):
         order = self._order(status=Order.Status.PREPARING)
+        self.client.login(email="tracker@example.com", password="trackpass123")
         response = self.client.get(reverse("orders:track_status", args=[order.number]))
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -819,8 +857,10 @@ class TrackingTests(TestCase):
     def test_notify_pref_unsubscribe_via_token(self):
         order = self._order()
         token = order.notification_token()
-        response = self.client.get(reverse("orders:notify_pref"), {"token": token, "off": "1"})
-        self.assertRedirects(response, reverse("orders:track", args=[order.number]))
+        response = self.client.get(
+            reverse("orders:notify_pref"), {"token": token, "off": "1"}
+        )
+        self.assertRedirects(response, reverse("store:home"))
         order.refresh_from_db()
         self.assertFalse(order.notify_email)
 
@@ -835,14 +875,35 @@ class TrackingTests(TestCase):
 
     def test_track_lookup_by_email_lists_orders(self):
         self._order()
-        response = self.client.get(reverse("orders:track_lookup"), {"number": self.user.email})
+        self.client.login(email=self.user.email, password="trackpass123")
+        response = self.client.get(
+            reverse("orders:track_lookup"), {"number": self.user.email}
+        )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "CB")
 
+    def test_track_lookup_hides_other_emails(self):
+        self._order()
+        self.client.login(email="stranger@example.com", password="nope12345")
+        response = self.client.get(
+            reverse("orders:track_lookup"), {"number": self.user.email}
+        )
+        self.assertRedirects(response, reverse("orders:track_lookup"))
+
     def test_track_lookup_by_number_redirects(self):
         order = self._order()
-        response = self.client.get(reverse("orders:track_lookup"), {"number": order.number.lower()})
+        self.client.login(email=self.user.email, password="trackpass123")
+        response = self.client.get(
+            reverse("orders:track_lookup"), {"number": order.number.lower()}
+        )
         self.assertRedirects(response, reverse("orders:track", args=[order.number]))
+
+    def test_track_status_hides_anonymous_requests(self):
+        order = self._order()
+        response = self.client.get(
+            reverse("orders:track_status", args=[order.number])
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_courier_live_flag(self):
         order = self._order(status=Order.Status.OUT_FOR_DELIVERY, fulfillment="delivery")

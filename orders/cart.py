@@ -1,5 +1,7 @@
 """Session-backed shopping cart."""
 
+import hashlib
+import json
 from decimal import Decimal
 
 from django.conf import settings
@@ -20,11 +22,45 @@ class Cart:
         self.session = request.session
         self.cart = self.session.setdefault(CART_SESSION_KEY, {})
 
-    def _key(self, product):
+    @staticmethod
+    def _product_id(product):
         return str(product.pk if hasattr(product, "pk") else product)
 
+    @staticmethod
+    def _option_signature(options):
+        if not options:
+            return ""
+        clean = {}
+        for key in ("size", "milk"):
+            value = options.get(key)
+            if value:
+                clean[key] = str(value)
+        extras = options.get("extras") or []
+        extras = sorted({str(value) for value in extras if str(value).strip()})
+        if extras:
+            clean["extras"] = extras
+        return json.dumps(clean, sort_keys=True, separators=(",", ":"))
+
+    @classmethod
+    def _key(cls, product, options=None):
+        product_id = cls._product_id(product)
+        signature = cls._option_signature(options)
+        if not signature:
+            return product_id
+        digest = hashlib.sha256(signature.encode()).hexdigest()[:12]
+        return f"{product_id}:{digest}"
+
+    def _keys_for_product(self, product_id):
+        product_id = str(product_id)
+        prefix = f"{product_id}:"
+        return [
+            key
+            for key in self.cart
+            if key == product_id or key.startswith(prefix)
+        ]
+
     def add(self, product, quantity=1, options=None, override=False):
-        key = self._key(product)
+        key = self._key(product, options)
         entry = self.cart.get(key, {"quantity": 0, "options": options or {}})
         if override:
             entry["quantity"] = quantity
@@ -36,20 +72,27 @@ class Cart:
         self.cart[key] = entry
         self.save()
 
-    def update(self, product_id, quantity):
-        key = str(product_id)
-        if key in self.cart:
+    def update(self, product_id, quantity, key=None):
+        if key and key in self.cart:
+            keys = [key]
+        else:
+            keys = self._keys_for_product(product_id)
+        if not keys:
+            return
+        for line_key in keys:
             if quantity > 0:
-                self.cart[key]["quantity"] = min(int(quantity), 50)
+                self.cart[line_key]["quantity"] = min(int(quantity), 50)
             else:
-                self.remove(product_id)
-            self.save()
+                del self.cart[line_key]
+        self.save()
 
-    def remove(self, product_id):
-        key = str(product_id)
-        if key in self.cart:
+    def remove(self, product_id, key=None):
+        if key and key in self.cart:
             del self.cart[key]
-            self.save()
+        else:
+            for line_key in self._keys_for_product(product_id):
+                del self.cart[line_key]
+        self.save()
 
     def clear(self):
         self.session[CART_SESSION_KEY] = {}
@@ -66,15 +109,20 @@ class Cart:
         return sum(item["quantity"] for item in self.cart.values())
 
     def __iter__(self):
-        product_ids = self.cart.keys()
+        product_ids = {
+            key.split(":", 1)[0]
+            for key in self.cart
+            if key.split(":", 1)[0].isdigit()
+        }
         products = Product.objects.filter(pk__in=product_ids).select_related("category")
         product_map = {str(p.pk): p for p in products}
         for key, item in self.cart.items():
-            product = product_map.get(key)
+            product = product_map.get(key.split(":", 1)[0])
             if not product:
                 continue
             unit_price = product.price
             yield {
+                "key": key,
                 "product": product,
                 "quantity": item["quantity"],
                 "options": item.get("options", {}),
