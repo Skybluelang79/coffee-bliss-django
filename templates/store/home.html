@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static humanize %}
 
-{% block title %}Coffee Bliss — Craft Coffee, Reimagined in 3D{% endblock %}
+{% block title %}Coffee Bliss — Craft Coffee, Poured Fresh{% endblock %}
 
 {% block extra_head %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
@@ -170,15 +170,14 @@
 {% endblock %}
 
 {% block content %}
-<section class="hero">
-  <canvas id="hero-canvas"></canvas>
+<section class="hero hero-split">
   <div class="hero-orb orb-a"></div>
   <div class="hero-orb orb-b"></div>
 
   <div class="container hero-grid">
     <div class="hero-copy">
       <span class="eyebrow">Small-batch • Freshly roasted • Delivered</span>
-      <h1>Your daily cup of <span class="gradient-text">pure bliss</span>, poured in 3D.</h1>
+      <h1>Your daily cup of <span class="gradient-text">pure bliss</span>, poured to perfection.</h1>
       <p class="lead">Explore single-origin beans, handcrafted espresso and cozy café moments — all from a beautifully immersive ordering experience built for coffee lovers.</p>
       <div class="hero-cta">
         <a href="{% url 'store:menu' %}" class="btn">Order now →</a>
@@ -190,6 +189,25 @@
         <div class="stat"><b>{{ stats.locations }}</b><span>Cafés</span></div>
         <div class="stat"><b>2M+</b><span>Cups poured</span></div>
       </div>
+    </div>
+
+    <div class="hero-media">
+      <div class="hero-video-frame">
+        {% if hero_video_url %}
+          <video class="hero-video" autoplay muted loop playsinline preload="metadata" poster="{% static 'img/products/caramel-latte.jpg' %}" aria-hidden="true">
+            <source src="{{ hero_video_url }}" type="video/mp4">
+          </video>
+          <div class="hero-video-overlay"></div>
+        {% else %}
+          <div class="hero-video-fallback" style="background-image: url('{% static 'img/products/caramel-latte.jpg' %}')"></div>
+        {% endif %}
+      </div>
+      {% if hero_video_url %}
+        <p class="hero-video-credit">
+          Video: <a href="https://stock.adobe.com/ng/video/coffee-beverage-and-cappuccino-during-a-cozy-morning-breakfast-with-steaming-hot-drink-being-enjoyed-in-a-rustic-setting-relaxation-wellness-and-indulgence-with-aromatic-coffee-beans-fresh-citrus/1939402827?clickref=1011lDNbmwQb&mv=affiliate&mv2=pz&as_camptype=similar-sx_1003_in_grid_ads-control&as_channel=affiliate&as_source=partnerize&as_campaign=cheezy" target="_blank" rel="noopener noreferrer">Cozy morning coffee</a>
+          via Adobe Stock
+        </p>
+      {% endif %}
     </div>
   </div>
 </section>
@@ -353,6 +371,15 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/hero3d.js' %}" defer></script>
 <script src="{% static 'js/product3d.js' %}" defer></script>
+<script>
+  (function () {
+    var video = document.querySelector(".hero-video");
+    if (!video || !window.matchMedia) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      video.removeAttribute("autoplay");
+      video.pause();
+    }
+  })();
+</script>
 {% endblock %}

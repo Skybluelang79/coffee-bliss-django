@@ -1,11 +1,11 @@
 # ☕ Coffee Bliss
 
 A professional, full-stack coffee shop platform built with **Django** — featuring an
-immersive **3D landing page**, **real payments**, a live **kitchen display**, **inventory
+immersive **video landing page**, **real payments**, a live **kitchen display**, **inventory
 management**, role-based dashboards for customers, staff and administrators, loyalty
 rewards, subscriptions, reservations and a REST API.
 
-> **Pure bliss, poured in 3D.** Small-batch roasts, handcrafted drinks, and a
+> **Pure bliss, freshly poured.** Small-batch roasts, handcrafted drinks, and a
 > delightful ordering experience.
 
 ---
@@ -13,7 +13,7 @@ rewards, subscriptions, reservations and a REST API.
 ## ✨ Highlights
 
 ### Immersive customer experience
-- **3D hero page** rendered with Three.js (rotating coffee cup, steam, floating beans, parallax).
+- **Video hero** showing a cozy morning coffee pour, framed beside the headline for a clean, focused layout.
 - Animated product cards with 3D tilt, glassmorphism and reveal-on-scroll.
 - Full **menu** with category / type / roast filters, search, sorting and pagination.
 - Rich **product pages** — options (size, milk), nutrition, tasting notes, gallery, ratings.
@@ -100,10 +100,22 @@ the catalogue. `python manage.py seed` also repairs them automatically.
 
 ---
 
-## 🖼️ Front-page hero
+## 🎬 Front-page video
 
-The hero is text-centred over the animated Three.js scene (rotating cup, steam,
-floating beans). No product image is rendered in the hero itself.
+The hero keeps the headline and calls to action in a left column and places the
+coffee video in its own framed panel on the right (stacked on smaller screens).
+
+The clip is [Adobe Stock #1939402827](https://stock.adobe.com/ng/video/coffee-beverage-and-cappuccino-during-a-cozy-morning-breakfast-with-steaming-hot-drink-being-enjoyed-in-a-rustic-setting-relaxation-wellness-and-indulgence-with-aromatic-coffee-beans-fresh-citrus/1939402827).
+Adobe Stock media requires a licence; download the licensed MP4 and save it as:
+
+```text
+static/video/hero-coffee.mp4
+```
+
+Alternatively set `HERO_VIDEO_URL` to a hosted MP4. The hero automatically falls
+back to a still coffee image until the video file is present. A credit link is
+shown beneath the video frame; Adobe Stock's standard licence does not require
+attribution, but it is included for transparency.
 
 ---
 
@@ -111,7 +123,7 @@ floating beans). No product image is rendered in the hero itself.
 
 | URL | Description |
 |-----|-------------|
-| `/` | 3D landing page |
+| `/` | Video landing page |
 | `/menu/` | Full product catalogue with filters |
 | `/subscriptions/` | Coffee Club plans (sectioned plan guide) |
 | `/assistant/chat/` `/assistant/staff/chat/` | AI assistant JSON endpoints (POST) |
@@ -164,7 +176,7 @@ coffee-bliss/
 ├── api/             # DRF serializers, viewsets, auth & cart endpoints
 ├── assistant/       # AI chat endpoints, live context, local fallback
 ├── templates/       # all HTML templates
-├── static/          # css, js (main.js, assistant.js, hero3d.js), images
+├── static/          # css, js (main.js, assistant.js), images, video
 └── manage.py
 ```
 

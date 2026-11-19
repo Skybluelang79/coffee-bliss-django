@@ -36,4 +36,5 @@ def site_context(request):
         "current_year": timezone.now().year,
         "ai_assistant_enabled": bool(getattr(settings, "AI_ENABLED", True)),
         "assistant_surface": "staff" if staff_area else "customer",
+        "hero_video_url": getattr(settings, "HERO_VIDEO_URL", ""),
     }

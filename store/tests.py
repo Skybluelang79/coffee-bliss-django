@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import User
@@ -30,6 +30,19 @@ class StoreViewTests(TestCase):
         response = self.client.get(reverse("store:home"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Coffee")
+
+    @override_settings(HERO_VIDEO_URL="/static/video/hero-coffee.mp4")
+    def test_home_page_renders_hero_video_and_credit(self):
+        response = self.client.get(reverse("store:home"))
+        self.assertContains(response, 'class="hero-video"')
+        self.assertContains(response, "/static/video/hero-coffee.mp4")
+        self.assertContains(response, "Adobe Stock")
+
+    @override_settings(HERO_VIDEO_URL="")
+    def test_home_page_falls_back_without_video(self):
+        response = self.client.get(reverse("store:home"))
+        self.assertContains(response, 'class="hero-video-fallback"')
+        self.assertNotContains(response, 'class="hero-video"')
 
     def test_menu_page(self):
         response = self.client.get(reverse("store:menu"))
