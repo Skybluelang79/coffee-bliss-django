@@ -125,7 +125,7 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 
 HERO_VIDEO_URL = env("HERO_VIDEO_URL", default="")
 if not HERO_VIDEO_URL and (BASE_DIR / "static" / "video" / "hero-coffee.mp4").is_file():
-    HERO_VIDEO_URL = f"{STATIC_URL}video/hero-coffee.mp4"
+    HERO_VIDEO_URL = f"/{STATIC_URL.strip('/')}/video/hero-coffee.mp4"
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"

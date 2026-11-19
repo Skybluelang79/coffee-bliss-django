@@ -1,0 +1,9 @@
+<aside class="dash-nav">
+  <a href="{% url 'dashboard:admin_home' %}" class="{% if nav == 'analytics' %}active{% endif %}">📊 Analytics</a>
+  <a href="{% url 'dashboard:admin_insights' %}" class="{% if nav == 'insights' %}active{% endif %}">✨ AI insights</a>
+  <a href="{% url 'dashboard:customers' %}" class="{% if nav == 'customers' %}active{% endif %}">👥 Customers</a>
+  <a href="{% url 'dashboard:reports' %}" class="{% if nav == 'reports' %}active{% endif %}">📈 Reports</a>
+  <a href="{% url 'dashboard:staff_orders' %}" class="{% if nav == 'orders' %}active{% endif %}">🧾 Orders</a>
+  <a href="{% url 'staff_portal' %}">🚀 Staff portal</a>
+  <a href="{% url 'admin:index' %}">⚙️ Django admin</a>
+</aside>

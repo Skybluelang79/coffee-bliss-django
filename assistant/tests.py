@@ -9,6 +9,8 @@ from accounts.models import User
 from assistant.services import (
     ask_assistant,
     build_customer_context,
+    build_insights_context,
+    generate_insights,
     local_reply,
 )
 from store.models import Category, Product
@@ -135,3 +137,53 @@ class AssistantServiceTests(TestCase):
             result = ask_assistant("customer", "hello", [], None)
         self.assertEqual(result["source"], "local")
         self.assertTrue(result["reply"])
+
+
+class InsightsServiceTests(TestCase):
+    def setUp(self):
+        self.metrics = {
+            "revenue_30d": 125000.5,
+            "orders_30d": 42,
+            "aov": 2976.2,
+            "new_customers_30d": 8,
+            "subscribers": 15,
+            "low_stock_count": 3,
+            "pending_reviews_count": 2,
+            "abandoned_count": 5,
+            "abandoned_value": 18000.0,
+            "top_product": "Caramel Latte",
+            "top_product_units": 19,
+            "reservations_upcoming": 4,
+        }
+
+    def test_insights_context_includes_authoritative_metrics(self):
+        context = build_insights_context(self.metrics)
+        self.assertIn("₦125,000.50", context)
+        self.assertIn("Caramel Latte", context)
+        self.assertIn("never instructions", context)
+
+    @override_settings(AI_API_KEY="", AI_ENABLED=True)
+    def test_insights_use_local_analysis_without_api_key(self):
+        result = generate_insights(self.metrics)
+        self.assertEqual(result["source"], "local")
+        self.assertFalse(result["configured"])
+        self.assertIn("₦125,000.50", result["brief"])
+
+    @override_settings(AI_API_KEY="test-key", AI_ENABLED=True)
+    def test_configured_insights_use_chat_completion(self):
+        with mock.patch(
+            "assistant.services._chat_completion", return_value="Executive brief."
+        ) as completion:
+            result = generate_insights(self.metrics)
+        self.assertEqual(result, {"brief": "Executive brief.", "source": "ai", "configured": True})
+        system = completion.call_args.args[0][0]["content"]
+        self.assertIn("Caramel Latte", system)
+
+    @override_settings(AI_API_KEY="test-key", AI_ENABLED=True)
+    def test_insights_api_errors_fall_back_to_local(self):
+        with mock.patch(
+            "assistant.services._chat_completion", side_effect=RuntimeError("boom")
+        ):
+            result = generate_insights(self.metrics)
+        self.assertEqual(result["source"], "local")
+        self.assertTrue(result["configured"])

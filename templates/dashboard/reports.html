@@ -4,11 +4,7 @@
 {% block content %}
 <div class="container">
   <div class="dash">
-    <aside class="dash-nav">
-      <a href="{% url 'dashboard:admin_home' %}">📊 Analytics</a>
-      <a href="{% url 'dashboard:customers' %}">👥 Customers</a>
-      <a href="{% url 'dashboard:reports' %}" class="active">📈 Reports</a>
-    </aside>
+    {% include "dashboard/_manager_nav.html" %}
     <div>
       <h1 style="font-size:1.9rem">Reports</h1>
       <div class="chip-row mt-2">
@@ -48,7 +44,7 @@
           {% endfor %}
         </div>
       </div>
-      <p class="muted small mt-2">Tip: export detailed data from the <a href="/django-admin/" class="gradient-text">Django admin</a> using built-in CSV exports (add a package for one-click export).</p>
+      <p class="muted small mt-2">Tip: export detailed data from the <a href="{% url 'admin:index' %}" class="gradient-text">Django admin</a> using its built-in CSV export action.</p>
     </div>
   </div>
 </div>

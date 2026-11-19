@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.shortcuts import redirect
 from django.urls import include, path
 
 from config.health import healthz
@@ -8,16 +9,22 @@ from dashboard.views import admin_home, staff_home
 
 
 def smart_admin(request):
-    """Route staff to the operations board, managers/admins to analytics."""
+    """Route staff to operations, managers to analytics, superusers to Django admin."""
     user = request.user
-    if user.is_authenticated and not user.is_superuser:
-        if user.role == "staff":
-            return staff_home(request)
-    return admin_home(request)
+    if not user.is_authenticated:
+        return redirect("accounts:login")
+    if user.is_superuser:
+        return redirect("admin:index")
+    if user.role == "staff":
+        return staff_home(request)
+    if user.is_manager:
+        return admin_home(request)
+    return redirect("store:home")
 
 
 urlpatterns = [
     path("healthz/", healthz, name="healthz"),
+    path("staff-portal/", smart_admin, name="staff_portal"),
     path("django-admin/", admin.site.urls),
     path("", include("store.urls")),
     path("accounts/", include("accounts.urls")),

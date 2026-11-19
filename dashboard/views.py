@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.cache import cache
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
 from django.shortcuts import get_object_or_404, redirect, render
@@ -10,6 +11,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.models import User
+from assistant.services import generate_insights
 from config.redirects import safe_redirect
 from orders.models import AbandonedCart, Order, OrderStatusHistory, Payment, Reservation
 from store.models import Coupon, NewsletterSubscriber, Product, Review
@@ -250,6 +252,7 @@ def admin_home(request):
     )
 
     context = {
+        "nav": "analytics",
         "chart": chart,
         "total_revenue": total_revenue,
         "max_revenue": max_revenue,
@@ -284,6 +287,70 @@ def admin_home(request):
     return render(request, "dashboard/admin_home.html", context)
 
 
+def _insight_metrics():
+    now = timezone.now()
+    start = now - timedelta(days=29)
+    paid = Order.objects.filter(payment_status=Order.PaymentStatus.PAID)
+    revenue_30d = paid.filter(created_at__gte=start).aggregate(
+        t=Coalesce(Sum("total"), Decimal("0"))
+    )["t"]
+    orders_30d = paid.filter(created_at__gte=start).count()
+    top_product = (
+        Product.objects.filter(order_items__order__payment_status=Order.PaymentStatus.PAID)
+        .annotate(sold=Sum("order_items__quantity"))
+        .order_by("-sold")
+        .first()
+    )
+    open_carts = AbandonedCart.objects.filter(status=AbandonedCart.Status.OPEN)
+    return {
+        "revenue_30d": float(revenue_30d),
+        "orders_30d": orders_30d,
+        "aov": float(revenue_30d / orders_30d) if orders_30d else 0.0,
+        "new_customers_30d": User.objects.filter(
+            role=User.Role.CUSTOMER, date_joined__gte=start
+        ).count(),
+        "subscribers": NewsletterSubscriber.objects.filter(is_active=True).count(),
+        "low_stock_count": Product.objects.filter(is_active=True, stock__lt=10).count(),
+        "pending_reviews_count": Review.objects.filter(is_approved=False).count(),
+        "abandoned_count": open_carts.count(),
+        "abandoned_value": float(
+            open_carts.aggregate(t=Coalesce(Sum("subtotal"), Decimal("0")))["t"]
+        ),
+        "top_product": top_product.name if top_product else "",
+        "top_product_units": top_product.sold if top_product else 0,
+        "reservations_upcoming": Reservation.objects.filter(
+            date__gte=now.date(), status=Reservation.Status.CONFIRMED
+        ).count(),
+    }
+
+
+@manager_required
+def admin_insights(request):
+    """Executive AI brief generated from live, read-only metrics."""
+    metrics = _insight_metrics()
+    cache_key = f"coffee-bliss:insights:{timezone.now().date()}"
+    insight = cache.get(cache_key)
+    if not insight:
+        insight = generate_insights(metrics)
+        cache.set(cache_key, insight, 300)
+    return render(
+        request,
+        "dashboard/insights.html",
+        {
+            "nav": "insights",
+            "insight": insight,
+            "metrics": metrics,
+        },
+    )
+
+
+@manager_required
+@require_POST
+def refresh_admin_insights(request):
+    cache.delete(f"coffee-bliss:insights:{timezone.now().date()}")
+    return redirect("dashboard:admin_insights")
+
+
 @manager_required
 @require_POST
 def send_cart_reminders(request):
@@ -311,17 +378,29 @@ def customers(request):
     )
     if query:
         users = users.filter(Q(email__icontains=query) | Q(first_name__icontains=query) | Q(last_name__icontains=query))
-    return render(request, "dashboard/customers.html", {"users": users, "query": query})
+    return render(
+        request,
+        "dashboard/customers.html",
+        {"nav": "customers", "users": users, "query": query},
+    )
 
 
 @manager_required
 def customer_detail(request, pk):
     user = get_object_or_404(User, pk=pk)
     orders = user.orders.prefetch_related("items")
+    lifetime_value = orders.aggregate(
+        t=Coalesce(Sum("total", filter=Q(payment_status=Order.PaymentStatus.PAID)), Decimal("0"))
+    )["t"]
     return render(
         request,
         "dashboard/customer_detail.html",
-        {"customer": user, "orders": orders},
+        {
+            "nav": "customers",
+            "customer": user,
+            "orders": orders,
+            "lifetime_value": lifetime_value,
+        },
     )
 
 
@@ -343,6 +422,7 @@ def reports(request):
         request,
         "dashboard/reports.html",
         {
+            "nav": "reports",
             "period": period,
             "by_status": by_status,
             "by_fulfillment": by_fulfillment,

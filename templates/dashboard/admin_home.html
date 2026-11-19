@@ -4,13 +4,7 @@
 {% block content %}
 <div class="container">
   <div class="dash">
-    <aside class="dash-nav">
-      <a href="{% url 'dashboard:admin_home' %}" class="active">📊 Analytics</a>
-      <a href="{% url 'dashboard:customers' %}">👥 Customers</a>
-      <a href="{% url 'dashboard:reports' %}">📈 Reports</a>
-      <a href="{% url 'dashboard:staff_orders' %}">🧾 Orders</a>
-      <a href="/django-admin/">⚙️ Django admin</a>
-    </aside>
+    {% include "dashboard/_manager_nav.html" %}
     <div>
       <span class="eyebrow">Executive overview</span>
       <h1 style="font-size:1.9rem">Business dashboard</h1>
@@ -22,6 +16,17 @@
         <div class="card metric"><div class="label">Avg order value</div><div class="value">{{ currency_symbol }}{{ aov|floatformat:2 }}</div></div>
         <div class="card metric"><div class="label">Customers</div><div class="value">{{ customers }}</div><div class="delta">+{{ new_customers_30d }} this month</div></div>
         <div class="card metric"><div class="label">Subscribers</div><div class="value">{{ subscribers }}</div></div>
+      </div>
+
+      <div class="card panel mt-3 ai-insight-teaser">
+        <div class="flex between center wrap gap">
+          <div>
+            <span class="eyebrow">AI insights</span>
+            <h3>Your executive brief is ready</h3>
+            <p class="small muted mb-0">A live, read-only summary of revenue, stock, reviews and cart recovery opportunities.</p>
+          </div>
+          <a href="{% url 'dashboard:admin_insights' %}" class="btn btn-sm">Open brief →</a>
+        </div>
       </div>
 
       <div class="card panel mt-3">
@@ -94,7 +99,7 @@
         {% empty %}
           <p class="muted small">No abandoned carts — nice work!</p>
         {% endfor %}
-        <a href="/django-admin/orders/abandonedcart/" class="btn btn-ghost btn-sm mt-2">Manage in Django admin</a>
+        <a href="{% url 'admin:orders_abandonedcart_changelist' %}" class="btn btn-ghost btn-sm mt-2">Manage in Django admin</a>
       </div>
 
       {% if pending_reviews %}
@@ -107,7 +112,7 @@
             <span class="muted small">by {{ review.user.email }}</span>
           </div>
         {% endfor %}
-        <a href="/django-admin/store/review/" class="btn btn-ghost btn-sm mt-2">Moderate in Django admin</a>
+        <a href="{% url 'admin:store_review_changelist' %}" class="btn btn-ghost btn-sm mt-2">Moderate in Django admin</a>
       </div>
       {% endif %}
     </div>

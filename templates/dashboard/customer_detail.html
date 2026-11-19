@@ -4,11 +4,7 @@
 {% block content %}
 <div class="container">
   <div class="dash">
-    <aside class="dash-nav">
-      <a href="{% url 'dashboard:admin_home' %}">📊 Analytics</a>
-      <a href="{% url 'dashboard:customers' %}" class="active">👥 Customers</a>
-      <a href="{% url 'dashboard:reports' %}">📈 Reports</a>
-    </aside>
+    {% include "dashboard/_manager_nav.html" %}
     <div>
       <a href="{% url 'dashboard:customers' %}" class="btn btn-ghost btn-sm">← All customers</a>
       <div class="flex center gap mt-2">
@@ -24,7 +20,7 @@
 
       <div class="metric-grid mt-3">
         <div class="card metric"><div class="label">Orders</div><div class="value">{{ orders|length }}</div></div>
-        <div class="card metric"><div class="label">Lifetime value</div><div class="value">{{ currency_symbol }}{{ orders.first.total|default:0|floatformat:2 }}</div></div>
+        <div class="card metric"><div class="label">Lifetime value</div><div class="value">{{ currency_symbol }}{{ lifetime_value|default:0|floatformat:2 }}</div></div>
         <div class="card metric"><div class="label">Joined</div><div class="value" style="font-size:1.2rem">{{ customer.date_joined|date:"M Y" }}</div></div>
       </div>
 

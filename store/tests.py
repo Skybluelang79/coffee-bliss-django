@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -30,6 +31,9 @@ class StoreViewTests(TestCase):
         response = self.client.get(reverse("store:home"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Coffee")
+
+    def test_hero_video_is_detected_from_bundled_file(self):
+        self.assertEqual(settings.HERO_VIDEO_URL, "/static/video/hero-coffee.mp4")
 
     @override_settings(HERO_VIDEO_URL="/static/video/hero-coffee.mp4")
     def test_home_page_renders_hero_video_and_credit(self):

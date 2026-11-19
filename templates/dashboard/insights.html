@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}AI Insights — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="dash">
+    {% include "dashboard/_manager_nav.html" %}
+    <div>
+      <div class="flex between center wrap gap">
+        <div>
+          <span class="eyebrow">Executive intelligence</span>
+          <h1 style="font-size:1.9rem">AI insights</h1>
+          <p class="muted small">A live briefing generated from your dashboard metrics. Advisory only.</p>
+        </div>
+        <span class="pill-note">{% if insight.source == 'ai' %}✨ AI generated{% else %}📘 Local analysis{% endif %}</span>
+      </div>
+
+      <div class="card panel mt-3 ai-brief">
+        <div class="flex between center mb-1">
+          <h3>Executive brief</h3>
+          <span class="muted small">Last 30 days</span>
+        </div>
+        <div class="ai-brief-text">{{ insight.brief|linebreaks }}</div>
+        <form method="post" action="{% url 'dashboard:refresh_admin_insights' %}" class="mt-2">
+          {% csrf_token %}
+          <button class="btn btn-ghost btn-sm" type="submit">Regenerate brief</button>
+        </form>
+      </div>
+
+      <div class="metric-grid mt-3">
+        <div class="card metric"><div class="label">Revenue (30 days)</div><div class="value">{{ currency_symbol }}{{ metrics.revenue_30d|floatformat:2 }}</div></div>
+        <div class="card metric"><div class="label">Paid orders</div><div class="value">{{ metrics.orders_30d }}</div></div>
+        <div class="card metric"><div class="label">Avg order value</div><div class="value">{{ currency_symbol }}{{ metrics.aov|floatformat:2 }}</div></div>
+        <div class="card metric"><div class="label">New customers</div><div class="value">{{ metrics.new_customers_30d }}</div></div>
+        <div class="card metric"><div class="label">Low-stock items</div><div class="value">{{ metrics.low_stock_count }}</div></div>
+        <div class="card metric"><div class="label">Open carts</div><div class="value">{{ metrics.abandoned_count }}</div></div>
+      </div>
+
+      <div class="card panel mt-3">
+        <h3>How this works</h3>
+        <p class="small muted">
+          {% if insight.configured %}
+            A configured AI model writes the brief from read-only metrics. If the model is
+            unavailable, a deterministic local analysis is used automatically.
+          {% else %}
+            No AI API key is configured, so the brief uses deterministic local analysis.
+            Add an AI API key to enable model-generated briefs.
+          {% endif %}
+          Nothing in this panel changes orders, stock or customer records.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
