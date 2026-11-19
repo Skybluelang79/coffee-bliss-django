@@ -1,6 +1,6 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from drf_spectacular.views import SpectacularAPIView
 
 from . import views
 
@@ -22,5 +22,5 @@ urlpatterns = [
     path("auth/me/", views.api_me, name="me"),
     path("cart/", views.api_cart, name="cart"),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
-    path("docs/", SpectacularSwaggerView.as_view(url_name="api:schema"), name="docs"),
+    path("docs/", views.BrandedApiDocsView.as_view(url_name="api:schema"), name="docs"),
 ]

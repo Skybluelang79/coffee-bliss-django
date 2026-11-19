@@ -1,6 +1,7 @@
 from django.contrib.auth import authenticate, login, logout
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema, inline_serializer
+from drf_spectacular.views import SpectacularSwaggerView
 from rest_framework import status, viewsets, permissions, serializers as drf_serializers
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -205,3 +206,7 @@ def api_cart(request):
             "total": str(cart.grand_total),
         }
     )
+
+
+class BrandedApiDocsView(SpectacularSwaggerView):
+    template_name = "api/docs.html"

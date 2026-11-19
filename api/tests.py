@@ -53,6 +53,14 @@ class ApiTests(TestCase):
         response = self.client.get("/api/schema/")
         self.assertEqual(response.status_code, 200)
 
+    def test_docs_page_is_branded(self):
+        response = self.client.get(reverse("api:docs"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Coffee Bliss API")
+        self.assertContains(response, "Developer API")
+        self.assertContains(response, reverse("api:schema"))
+        self.assertContains(response, 'id="swagger-ui"')
+
 
 class HealthCheckTests(TestCase):
     def test_healthz_reports_database(self):

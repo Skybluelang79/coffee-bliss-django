@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}API Docs — {{ SITE_NAME }}{% endblock %}
+{% block meta_description %}Explore the Coffee Bliss REST API for products, categories, orders, reservations and Coffee Club plans.{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ swagger_ui_css }}" />
+<style>
+  .api-endpoint-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+  .api-endpoint { padding: 1.2rem; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); text-decoration: none; color: inherit; transition: transform .2s ease, border-color .2s ease; }
+  .api-endpoint:hover { transform: translateY(-2px); border-color: var(--brand); }
+  .api-endpoint .method { display: inline-block; font: 600 .72rem/1.4 monospace; letter-spacing: .06em; color: var(--brand-2); background: rgba(200, 150, 62, .12); padding: .2rem .5rem; border-radius: 6px; margin-bottom: .6rem; }
+  .api-endpoint h3 { margin: 0 0 .35rem; font-size: 1rem; }
+  .api-endpoint p { margin: 0; font-size: .82rem; color: var(--muted); }
+  .swagger-section { background: #fff; color: #1b1108; overflow-x: auto; }
+  .swagger-section h3, .swagger-section .eyebrow { color: #1b1108; }
+  #swagger-ui { margin-top: .5rem; }
+  #swagger-ui .topbar, #swagger-ui .info .title { display: none; }
+  .api-base-url { font-family: monospace; font-size: .9rem; color: var(--brand-2); }
+  @media (max-width: 1024px) { .api-endpoint-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 600px) { .api-endpoint-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+{% block content %}
+<section class="container section">
+  <div class="page-heading reveal">
+    <span class="eyebrow">Developer API</span>
+    <h1>Coffee Bliss API</h1>
+    <p class="lead">A REST API for the catalog, locations, orders, reservations, carts and Coffee Club plans. Browse it here or download the OpenAPI schema.</p>
+  </div>
+
+  <div class="card panel mt-3 reveal">
+    <div class="flex between center wrap gap">
+      <div>
+        <span class="eyebrow">Base URL</span>
+        <p class="api-base-url mb-0">{{ request.scheme }}://{{ request.get_host }}/api/</p>
+      </div>
+      <a href="{% url 'api:schema' %}" class="btn btn-sm">Download schema</a>
+    </div>
+  </div>
+
+  <div class="api-endpoint-grid mt-3 reveal">
+    <a href="{% url 'api:product-list' %}" class="api-endpoint"><span class="method">READ</span><h3>Products</h3><p>Searchable drinks, beans, food and merch.</p></a>
+    <a href="{% url 'api:category-list' %}" class="api-endpoint"><span class="method">READ</span><h3>Categories</h3><p>Curated menu categories and icons.</p></a>
+    <a href="{% url 'api:plan-list' %}" class="api-endpoint"><span class="method">READ</span><h3>Coffee Club</h3><p>Subscription plans and pricing.</p></a>
+    <a href="{% url 'api:location-list' %}" class="api-endpoint"><span class="method">READ</span><h3>Locations</h3><p>Cafés, hours and contact details.</p></a>
+    <a href="{% url 'api:order-list' %}" class="api-endpoint"><span class="method">AUTH</span><h3>Orders</h3><p>Signed-in customers can review their orders.</p></a>
+    <a href="{% url 'api:reservation-list' %}" class="api-endpoint"><span class="method">READ/WRITE</span><h3>Reservations</h3><p>Browse and create café bookings.</p></a>
+    <a href="{% url 'api:login' %}" class="api-endpoint"><span class="method">POST</span><h3>Authentication</h3><p>Register, sign in and inspect your profile.</p></a>
+    <a href="{% url 'api:cart' %}" class="api-endpoint"><span class="method">SESSION</span><h3>Cart</h3><p>Add, update and clear the current cart.</p></a>
+  </div>
+
+  <div class="card panel mt-3 reveal">
+    <h3>Authentication &amp; permissions</h3>
+    <p class="small muted mb-0">Public endpoints are safe to read. Orders require sign-in; menu changes require staff access. Sign in through <a href="{% url 'api:login' %}">/api/auth/login/</a> to use session authentication, then call <a href="{% url 'api:me' %}">/api/auth/me/</a> to confirm your session.</p>
+  </div>
+
+  <div class="card panel mt-3 swagger-section reveal">
+    <div class="flex between center wrap gap">
+      <div>
+        <span class="eyebrow">Interactive explorer</span>
+        <h3>Try the endpoints</h3>
+      </div>
+      <span class="pill-note">OpenAPI 3</span>
+    </div>
+    <div id="swagger-ui"></div>
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ swagger_ui_bundle }}"></script>
+<script src="{{ swagger_ui_standalone }}"></script>
+{% include template_name_js %}
+{% endblock %}
