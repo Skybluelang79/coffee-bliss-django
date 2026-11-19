@@ -231,7 +231,7 @@
       {% for category in categories|slice:":4" %}
         {% if category.display_image %}
           <a href="{{ category.get_absolute_url }}" class="circular-menu-item has-img item-{{ forloop.counter }}">
-            <img src="{{ category.display_image }}" alt="{{ category.name }}" loading="lazy" />
+            <img src="{{ category.display_image }}" alt="" loading="lazy" />
             <div class="label">{{ category.name }}</div>
           </a>
         {% else %}
@@ -244,19 +244,19 @@
         {% endif %}
       {% empty %}
         <a href="{% url 'store:menu' %}?kind=drink" class="circular-menu-item has-img item-1">
-          <img src="{% static 'img/categories/espresso-coffee.jpg' %}" alt="Coffee" loading="lazy" />
+          <img src="{% static 'img/categories/espresso-coffee.jpg' %}" alt="" loading="lazy" />
           <div class="label">Coffee</div>
         </a>
         <a href="{% url 'store:menu' %}?kind=food" class="circular-menu-item has-img item-2">
-          <img src="{% static 'img/categories/bakery-food.png' %}" alt="Breakfast" loading="lazy" />
+          <img src="{% static 'img/categories/bakery-food.png' %}" alt="" loading="lazy" />
           <div class="label">Breakfast</div>
         </a>
         <a href="{% url 'store:menu' %}?kind=beans" class="circular-menu-item has-img item-3">
-          <img src="{% static 'img/categories/beans-grounds.jpg' %}" alt="Beans" loading="lazy" />
+          <img src="{% static 'img/categories/beans-grounds.jpg' %}" alt="" loading="lazy" />
           <div class="label">Beans</div>
         </a>
         <a href="{% url 'store:menu' %}?kind=merch" class="circular-menu-item has-img item-4">
-          <img src="{% static 'img/categories/merchandise.jpg' %}" alt="Merch" loading="lazy" />
+          <img src="{% static 'img/categories/merchandise.jpg' %}" alt="" loading="lazy" />
           <div class="label">Merch</div>
         </a>
       {% endfor %}
