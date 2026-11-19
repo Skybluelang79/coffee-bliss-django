@@ -21,6 +21,14 @@ class TimeStampedModel(models.Model):
         abstract = True
 
 
+CATEGORY_IMAGE_ALIASES = {
+    "coffee": "espresso-coffee",
+    "breakfast": "bakery-food",
+    "beans": "beans-grounds",
+    "merch": "merchandise",
+}
+
+
 def _static_image(folder, slug):
     """Return the URL of a bundled static image for a slug, if one exists."""
     from django.templatetags.static import static
@@ -65,7 +73,8 @@ class Category(TimeStampedModel):
     def display_image(self):
         if self.image:
             return self.image.url
-        return _static_image("categories", self.slug)
+        slug = CATEGORY_IMAGE_ALIASES.get(self.slug, self.slug)
+        return _static_image("categories", slug)
 
     @property
     def product_count(self):

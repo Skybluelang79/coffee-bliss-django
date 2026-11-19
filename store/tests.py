@@ -35,6 +35,11 @@ class StoreViewTests(TestCase):
     def test_hero_video_is_detected_from_bundled_file(self):
         self.assertEqual(settings.HERO_VIDEO_URL, "/static/video/hero-coffee.mp4")
 
+    def test_short_category_slug_uses_bundled_photo(self):
+        self.assertEqual(
+            self.category.display_image, "/static/img/categories/espresso-coffee.jpg"
+        )
+
     @override_settings(HERO_VIDEO_URL="/static/video/hero-coffee.mp4")
     def test_home_page_renders_hero_video_and_credit(self):
         response = self.client.get(reverse("store:home"))
@@ -184,3 +189,13 @@ class LegalPageTests(TestCase):
         self.assertEqual(
             self.client.get(reverse("store:legal", args=["nope"])).status_code, 404
         )
+
+
+class HomeCategoryFallbackTests(TestCase):
+    def test_home_page_uses_photo_fallback_without_categories(self):
+        response = self.client.get(reverse("store:home"))
+        self.assertContains(response, 'class="circular-menu-item has-img item-1"')
+        self.assertContains(response, "/static/img/categories/espresso-coffee.jpg")
+        self.assertContains(response, "/static/img/categories/bakery-food.png")
+        self.assertContains(response, "/static/img/categories/beans-grounds.jpg")
+        self.assertContains(response, "/static/img/categories/merchandise.jpg")

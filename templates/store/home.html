@@ -243,17 +243,21 @@
           </a>
         {% endif %}
       {% empty %}
-        <a href="{% url 'store:menu' %}?kind=drink" class="circular-menu-item item-1">
-          <div><div class="emoji">☕</div><div class="label">Coffee</div></div>
+        <a href="{% url 'store:menu' %}?kind=drink" class="circular-menu-item has-img item-1">
+          <img src="{% static 'img/categories/espresso-coffee.jpg' %}" alt="Coffee" loading="lazy" />
+          <div class="label">Coffee</div>
         </a>
-        <a href="{% url 'store:menu' %}?kind=food" class="circular-menu-item item-2">
-          <div><div class="emoji">🥐</div><div class="label">Breakfast</div></div>
+        <a href="{% url 'store:menu' %}?kind=food" class="circular-menu-item has-img item-2">
+          <img src="{% static 'img/categories/bakery-food.png' %}" alt="Breakfast" loading="lazy" />
+          <div class="label">Breakfast</div>
         </a>
-        <a href="{% url 'store:menu' %}?kind=beans" class="circular-menu-item item-3">
-          <div><div class="emoji">🫘</div><div class="label">Beans</div></div>
+        <a href="{% url 'store:menu' %}?kind=beans" class="circular-menu-item has-img item-3">
+          <img src="{% static 'img/categories/beans-grounds.jpg' %}" alt="Beans" loading="lazy" />
+          <div class="label">Beans</div>
         </a>
-        <a href="{% url 'store:menu' %}?kind=merch" class="circular-menu-item item-4">
-          <div><div class="emoji">🛍️</div><div class="label">Merch</div></div>
+        <a href="{% url 'store:menu' %}?kind=merch" class="circular-menu-item has-img item-4">
+          <img src="{% static 'img/categories/merchandise.jpg' %}" alt="Merch" loading="lazy" />
+          <div class="label">Merch</div>
         </a>
       {% endfor %}
     </div>
